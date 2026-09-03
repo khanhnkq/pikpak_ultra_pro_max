@@ -1,0 +1,74 @@
+{
+  "manifest_version": 3,
+  "name": "PikPak Streamer Ultra Pro Max",
+  "version": "1.0.0",
+  "description": "Xem video full trực tiếp từ link chia sẻ công khai PikPak mà không cần lưu vào tài khoản hay giới hạn 30s.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "permissions": [
+    "declarativeNetRequest",
+    "declarativeNetRequestWithHostAccess",
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "*://*.mypikpak.com/*",
+    "*://*.mypikpak.net/*",
+    "*://api-drive.mypikpak.com/*",
+    "*://api-drive.mypikpak.net/*",
+    "*://user.mypikpak.com/*",
+    "*://user.mypikpak.net/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.mypikpak.com/*",
+        "*://*.mypikpak.net/*"
+      ],
+      "js": [
+        "content/injector.js"
+      ],
+      "run_at": "document_start",
+      "world": "ISOLATED"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "content/main.js",
+        "player/player.js",
+        "player/player.css",
+        "lib/constants.js",
+        "lib/md5.js",
+        "lib/pikpak-api.js"
+      ],
+      "matches": [
+        "*://*.mypikpak.com/*",
+        "*://*.mypikpak.net/*"
+      ]
+    }
+  ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "pikpak_stream_rules",
+        "enabled": true,
+        "path": "rules.json"
+      }
+    ]
+  }
+}

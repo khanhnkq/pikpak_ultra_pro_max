@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PikPak Streamer</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <div class="logo-badge">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>PikPak Streamer</h1>
+          <span class="version-tag">Ultra Pro Max</span>
+        </div>
+      </div>
+      <div class="status-indicator">
+        <span class="dot" id="header-status-dot"></span>
+        <span class="status-text" id="header-status-text">Đang kiểm tra...</span>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="content">
+      <!-- Quick Info / Current Tab Banner -->
+      <div id="tab-banner" class="tab-banner">
+        <div class="banner-icon">💡</div>
+        <div class="banner-text" id="tab-banner-text">Mở link chia sẻ PikPak để xem video không giới hạn 30s.</div>
+      </div>
+
+      <!-- Manual Input Section -->
+      <section class="section">
+        <label class="input-label" for="share-url-input">Link chia sẻ PikPak</label>
+        <div class="input-group">
+          <input 
+            type="text" 
+            id="share-url-input" 
+            class="input-field" 
+            placeholder="https://mypikpak.com/s/xxxx..."
+            autocomplete="off"
+            spellcheck="false"
+          >
+          <button id="paste-btn" class="icon-btn" title="Dán từ Clipboard">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+        </div>
+
+        <div class="input-group password-group" id="pwd-group" style="display: none;">
+          <input 
+            type="text" 
+            id="share-pwd-input" 
+            class="input-field" 
+            placeholder="Mật khẩu truy cập (nếu có)"
+            autocomplete="off"
+          >
+        </div>
+
+        <button id="resolve-btn" class="action-btn primary-btn">
+          <span class="btn-icon">⚡</span>
+          <span class="btn-text" id="resolve-btn-text">Trích xuất luồng Video</span>
+        </button>
+      </section>
+
+      <!-- Video Results List -->
+      <section class="section results-section" id="results-section" style="display: none;">
+        <div class="section-title-row">
+          <span class="section-title">Danh sách Video</span>
+          <span class="badge" id="video-count-badge">0 video</span>
+        </div>
+        <div class="video-list" id="video-list">
+          <!-- Dynamic Items -->
+        </div>
+      </section>
+
+      <!-- Quick Preferences -->
+      <section class="section settings-section">
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-name">Tự động hiện thanh công cụ</span>
+            <span class="setting-desc">Hiện nút mở khóa trực tiếp trên web PikPak</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="auto-toolbar-toggle" checked>
+            <span class="slider round"></span>
+          </label>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer-status" id="footer-status">Guest Mode (Không cần tài khoản)</div>
+      <div class="footer-links">
+        <span class="status-chip">CORS &amp; Range OK</span>
+      </div>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
