@@ -59,25 +59,20 @@
     }
 
     stepSpeed(dir) {
-      let idx = this.speeds.indexOf(this.modalVideo.playbackRate);
+      let idx = this.speeds.indexOf(this.modalVideo?.playbackRate);
       if (idx === -1) idx = this.currentSpeedIdx;
-      let nextIdx = Math.max(0, Math.min(this.speeds.length - 1, idx + dir));
-      this.setPlaybackSpeed(this.speeds[nextIdx]);
+      this.setPlaybackSpeed(this.speeds[Math.max(0, Math.min(this.speeds.length - 1, idx + dir))]);
     }
 
     setPlaybackSpeed(speed) {
       if (!this.modalVideo) return;
       this.modalVideo.playbackRate = speed;
       this.currentSpeedIdx = this.speeds.indexOf(speed);
-
       const label = document.getElementById("pp-speed-label");
       if (label) label.textContent = `${speed}x`;
-
       document.querySelectorAll("#pp-speed-menu .pp-dropdown-item").forEach((item) => {
-        const itemSpeed = parseFloat(item.dataset.speed);
-        item.classList.toggle("active", itemSpeed === speed);
+        item.classList.toggle("active", parseFloat(item.dataset.speed) === speed);
       });
-
       this.shortcuts.showHud(`⚡ ${speed}x`, null);
     }
 
@@ -97,34 +92,21 @@
     updatePlayPauseUI() {
       const btn = document.getElementById("pp-ctrl-play");
       const icons = root.PikPakIcons || {};
-      if (!btn || !this.modalVideo) return;
-      btn.innerHTML = this.modalVideo.paused ? icons.play : icons.pause;
+      if (btn && this.modalVideo) btn.innerHTML = this.modalVideo.paused ? icons.play : icons.pause;
     }
 
     updateVolumeUI() {
-      const v = this.modalVideo;
-      const volBtn = document.getElementById("pp-ctrl-volume");
-      const volSlider = document.getElementById("pp-volume-slider");
+      const v = this.modalVideo, volBtn = document.getElementById("pp-ctrl-volume"), volSlider = document.getElementById("pp-volume-slider");
       const icons = root.PikPakIcons || {};
       if (!v || !volBtn || !volSlider) return;
-
       volSlider.value = v.muted ? 0 : v.volume;
-
-      if (v.muted || v.volume === 0) {
-        volBtn.innerHTML = icons.volMute;
-      } else if (v.volume < 0.5) {
-        volBtn.innerHTML = icons.volLow;
-      } else {
-        volBtn.innerHTML = icons.volHigh;
-      }
+      volBtn.innerHTML = (v.muted || v.volume === 0) ? icons.volMute : (v.volume < 0.5 ? icons.volLow : icons.volHigh);
     }
 
     toggleFullscreen() {
-      const container = document.getElementById("pp-player-container");
-      const fsBtn = document.getElementById("pp-ctrl-fullscreen");
+      const container = document.getElementById("pp-player-container"), fsBtn = document.getElementById("pp-ctrl-fullscreen");
       const icons = root.PikPakIcons || {};
       if (!container) return;
-
       if (!document.fullscreenElement) {
         container.requestFullscreen().catch(() => {});
         if (fsBtn) fsBtn.innerHTML = icons.exitFullscreen;
@@ -168,26 +150,20 @@
     updateProgress() {
       const v = this.modalVideo;
       if (!v || this.isDraggingProgress) return;
-
-      const cur = v.currentTime || 0;
-      const dur = v.duration || 0;
+      const cur = v.currentTime || 0, dur = v.duration || 0;
       const pct = dur > 0 ? (cur / dur) * 100 : 0;
-
       const playedBar = document.getElementById("pp-progress-played");
       const curTimeEl = document.getElementById("pp-time-current");
       const totalTimeEl = document.getElementById("pp-time-total");
-
       if (playedBar) playedBar.style.width = `${pct}%`;
       if (curTimeEl) curTimeEl.textContent = formatTime(cur);
       if (totalTimeEl && dur > 0) totalTimeEl.textContent = formatTime(dur);
 
-      // Update buffer
       const bufferBar = document.getElementById("pp-progress-buffer");
       if (bufferBar && v.buffered.length > 0) {
         for (let i = 0; i < v.buffered.length; i++) {
           if (v.buffered.start(i) <= cur && cur <= v.buffered.end(i)) {
-            const bufPct = (v.buffered.end(i) / dur) * 100;
-            bufferBar.style.width = `${bufPct}%`;
+            bufferBar.style.width = `${(v.buffered.end(i) / dur) * 100}%`;
             break;
           }
         }
@@ -280,34 +256,18 @@
 
       // Controls buttons
       document.getElementById("pp-ctrl-play").addEventListener("click", () => this.togglePlay());
-      document.getElementById("pp-ctrl-prev").addEventListener("click", () => {
-        if (this.navigationHandlers?.onPrev) this.navigationHandlers.onPrev();
-      });
-      document.getElementById("pp-ctrl-next").addEventListener("click", () => {
-        if (this.navigationHandlers?.onNext) this.navigationHandlers.onNext();
-      });
+      document.getElementById("pp-ctrl-prev").addEventListener("click", () => this.navigationHandlers?.onPrev?.());
+      document.getElementById("pp-ctrl-next").addEventListener("click", () => this.navigationHandlers?.onNext?.());
+      document.getElementById("pp-ctrl-volume").addEventListener("click", () => { v.muted = !v.muted; this.updateVolumeUI(); });
 
-      // Volume controls
-      document.getElementById("pp-ctrl-volume").addEventListener("click", () => {
-        v.muted = !v.muted;
-        this.updateVolumeUI();
-      });
-
-      const volSlider = document.getElementById("pp-volume-slider");
-      volSlider.addEventListener("input", (e) => {
-        v.volume = parseFloat(e.target.value);
-        v.muted = false;
-        this.updateVolumeUI();
+      document.getElementById("pp-volume-slider")?.addEventListener("input", (e) => {
+        v.volume = parseFloat(e.target.value); v.muted = false; this.updateVolumeUI();
       });
 
       // Speed dropdown
-      const speedBtn = document.getElementById("pp-speed-btn");
-      const speedMenu = document.getElementById("pp-speed-menu");
-      speedBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        speedMenu.classList.toggle("show");
-      });
-      speedMenu.querySelectorAll(".pp-dropdown-item").forEach((item) => {
+      const speedBtn = document.getElementById("pp-speed-btn"), speedMenu = document.getElementById("pp-speed-menu");
+      speedBtn?.addEventListener("click", (e) => { e.stopPropagation(); speedMenu?.classList.toggle("show"); });
+      speedMenu?.querySelectorAll(".pp-dropdown-item").forEach((item) => {
         item.addEventListener("click", (e) => {
           e.stopPropagation();
           this.setPlaybackSpeed(parseFloat(item.dataset.speed));
@@ -315,24 +275,23 @@
         });
       });
 
-      // Close menus on outside click
       document.addEventListener("click", () => {
-        speedMenu.classList.remove("show");
-        const qMenu = document.getElementById("pp-quality-menu");
-        if (qMenu) qMenu.classList.remove("show");
+        speedMenu?.classList.remove("show");
+        document.getElementById("pp-quality-menu")?.classList.remove("show");
       });
 
+      // Top Action Buttons (Download & Close)
+      document.getElementById("pp-cinema-close-btn")?.addEventListener("click", () => this.closeCinemaModal());
+      document.getElementById("pp-cinema-download-btn")?.addEventListener("click", () => this.onDownloadHandler?.());
+
       // PiP, Shortcuts & Fullscreen
-      document.getElementById("pp-ctrl-pip").addEventListener("click", () => {
-        if (document.pictureInPictureElement) {
-          document.exitPictureInPicture().catch(() => {});
-        } else if (document.pictureInPictureEnabled) {
-          v.requestPictureInPicture().catch(() => {});
-        }
+      document.getElementById("pp-ctrl-pip")?.addEventListener("click", () => {
+        if (document.pictureInPictureElement) document.exitPictureInPicture().catch(() => {});
+        else if (document.pictureInPictureEnabled) v.requestPictureInPicture().catch(() => {});
       });
-      document.getElementById("pp-ctrl-shortcuts").addEventListener("click", () => this.shortcuts.toggleShortcutsModal());
-      document.getElementById("pp-shortcuts-close").addEventListener("click", () => this.shortcuts.toggleShortcutsModal(false));
-      document.getElementById("pp-ctrl-fullscreen").addEventListener("click", () => this.toggleFullscreen());
+      document.getElementById("pp-ctrl-shortcuts")?.addEventListener("click", () => this.shortcuts.toggleShortcutsModal());
+      document.getElementById("pp-shortcuts-close")?.addEventListener("click", () => this.shortcuts.toggleShortcutsModal(false));
+      document.getElementById("pp-ctrl-fullscreen")?.addEventListener("click", () => this.toggleFullscreen());
 
       // Video end & error listeners
       v.addEventListener("ended", () => {
@@ -347,8 +306,44 @@
       v.addEventListener("playing", () => this.updatePlayPauseUI());
     }
 
+    showInstantLoading(title, index = 0, playlist = [], navigationHandlers = {}) {
+      this.ensureModalDom();
+      this.navigationHandlers = navigationHandlers;
+      (document.body || document.documentElement).classList.add("pp-cinema-active");
+
+      document.querySelectorAll("video:not(#pikpak-ultra-modal-video)").forEach((v) => {
+        try { v.pause(); v.muted = true; v.volume = 0; v.style.display = "none"; } catch (_) {}
+      });
+
+      const titleEl = document.getElementById("pp-modal-filename"), counterEl = document.getElementById("pp-modal-counter");
+      const topInfo = document.getElementById("pp-modal-top-info"), spinner = document.getElementById("pp-cinema-spinner");
+      const spinnerText = document.getElementById("pp-spinner-text");
+
+      if (titleEl) titleEl.textContent = title || "Đang tải video...";
+      if (spinnerText) spinnerText.textContent = title ? `Đang mở: ${title}` : "Đang nạp luồng phát...";
+      if (spinner) spinner.classList.add("show");
+
+      if (playlist?.length > 0) {
+        if (counterEl) {
+          counterEl.textContent = `${index + 1} / ${playlist.length}`;
+          counterEl.style.display = "inline-flex";
+        }
+        document.getElementById("pp-ctrl-prev").style.opacity = index <= 0 ? "0.3" : "1";
+        document.getElementById("pp-ctrl-next").style.opacity = index >= playlist.length - 1 ? "0.3" : "1";
+      }
+
+      if (topInfo) topInfo.style.display = "flex";
+      this.drawer.render(playlist || [], index, (idx) => {
+        if (this.navigationHandlers?.onSelect) this.navigationHandlers.onSelect(idx);
+      });
+
+      this.modalContainer.classList.add("active");
+      this.isModalOpen = true;
+    }
+
     openCinemaModal(streamUrl, options = {}) {
       this.ensureModalDom();
+      this.onDownloadHandler = options.onDownload || null;
 
       this.currentStreamUrl = streamUrl;
       this.currentOptions = options;
@@ -414,6 +409,10 @@
         qualityWrap.style.display = "none";
       }
 
+      // Hide spinner
+      const spinner = document.getElementById("pp-cinema-spinner");
+      if (spinner) spinner.classList.remove("show");
+
       // Tối ưu hiệu năng: Dập tắt triệt để video gốc ở nền
       (document.body || document.documentElement).classList.add("pp-cinema-active");
       document.querySelectorAll("video:not(#pikpak-ultra-modal-video)").forEach((v) => {
@@ -434,9 +433,6 @@
 
       this.modalContainer.classList.add("active");
       this.isModalOpen = true;
-
-      const closeBtn = document.getElementById("pp-close-cinema-btn");
-      if (closeBtn) closeBtn.style.display = "inline-flex";
 
       const playPromise = this.modalVideo.play();
       if (playPromise !== undefined) {
@@ -463,10 +459,10 @@
       this.isModalOpen = false;
       (document.body || document.documentElement).classList.remove("pp-cinema-active");
 
-      if (this.modalVideo) this.modalVideo.pause();
+      const spinner = document.getElementById("pp-cinema-spinner");
+      if (spinner) spinner.classList.remove("show");
 
-      const closeBtn = document.getElementById("pp-close-cinema-btn");
-      if (closeBtn) closeBtn.style.display = "none";
+      if (this.modalVideo) this.modalVideo.pause();
 
       this.drawer.toggle(false);
 

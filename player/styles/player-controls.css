@@ -9,7 +9,7 @@
 #pikpak-ultra-cinema-modal {
   position: fixed;
   inset: 0;
-  z-index: 2147483640 !important; /* Dưới toolbar (2147483647) để toolbar luôn nổi lên trên video */
+  z-index: 2147483647 !important;
   display: flex;
   background: rgba(4, 5, 8, 0.98);
   backdrop-filter: blur(32px);
@@ -27,22 +27,28 @@
 }
 
 /* Tối ưu hiệu năng: Ẩn triệt để video gốc của PikPak ở nền (NGOẠI TRỪ modal player của extension) */
-body.pp-cinema-active video:not(#pikpak-ultra-modal-video) {
+.pp-cinema-active video:not(#pikpak-ultra-modal-video) {
   display: none !important;
   visibility: hidden !important;
-  width: 0 !important;
-  height: 0 !important;
+  width: 0 !important; height: 0 !important;
   opacity: 0 !important;
   pointer-events: none !important;
 }
 
-body.pp-cinema-active [class*="video-player"]:not(#pikpak-ultra-cinema-modal):not(#pikpak-ultra-cinema-modal *),
-body.pp-cinema-active [class*="preview-player"]:not(#pikpak-ultra-cinema-modal):not(#pikpak-ultra-cinema-modal *),
-body.pp-cinema-active [class*="dplayer"]:not(#pikpak-ultra-cinema-modal):not(#pikpak-ultra-cinema-modal *),
-body.pp-cinema-active [class*="artplayer"]:not(#pikpak-ultra-cinema-modal):not(#pikpak-ultra-cinema-modal *),
-body.pp-cinema-active div.player-container,
-body.pp-cinema-active div.video-container {
+.pp-cinema-active [class*="video-player"]:not(#pikpak-ultra-cinema-modal):not(#pikpak-ultra-cinema-modal *),
+.pp-cinema-active [class*="preview-player"]:not(#pikpak-ultra-cinema-modal):not(#pikpak-ultra-cinema-modal *),
+.pp-cinema-active [class*="dplayer"]:not(#pikpak-ultra-cinema-modal):not(#pikpak-ultra-cinema-modal *),
+.pp-cinema-active [class*="artplayer"]:not(#pikpak-ultra-cinema-modal):not(#pikpak-ultra-cinema-modal *),
+.pp-cinema-active #manager-preview-bar,
+.pp-cinema-active .preview-bar,
+.pp-cinema-active div.player-container,
+.pp-cinema-active div.video-container,
+.pp-cinema-active div[class*="play-modal"],
+.pp-cinema-active div[class*="preview-layer"] {
+  display: none !important;
   visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 /* Đảm bảo 100% modal player của extension luôn hiển thị rõ ràng */
@@ -53,52 +59,36 @@ body.pp-cinema-active div.video-container {
 
 /* Top-Left Video Title & Episode Badge */
 .pp-modal-top-info {
-  position: absolute;
-  top: 16px;
-  left: 20px;
-  z-index: 2147483645;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 14px;
-  background: var(--pp-glass-bg);
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
-  border: 1px solid var(--pp-glass-border);
-  border-radius: var(--pp-radius-pill);
-  color: var(--pp-text-primary);
-  font-size: 13px;
-  font-weight: 600;
-  max-width: 45vw;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  user-select: none;
-  pointer-events: none;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  position: absolute; top: 16px; left: 20px; z-index: 2147483645;
+  display: flex; align-items: center; gap: 10px; padding: 6px 14px;
+  background: var(--pp-glass-bg); backdrop-filter: blur(28px) saturate(180%); -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid var(--pp-glass-border); border-radius: var(--pp-radius-pill);
+  color: var(--pp-text-primary); font-size: 13px; font-weight: 600; max-width: 45vw;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: none; pointer-events: none;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45); transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.pp-modal-counter {
+  display: inline-flex; align-items: center; padding: 2px 8px; background: var(--pp-accent-subtle);
+  border: 1px solid var(--pp-accent-border); border-radius: 12px; font-size: 11px; font-weight: 700; color: var(--pp-accent); white-space: nowrap;
+}
+.pp-modal-title { font-size: 13px; font-weight: 600; color: var(--pp-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Top-Right Video Action Group (Download & Close) */
+.pp-modal-top-actions {
+  position: absolute; top: 16px; right: 20px; z-index: 2147483645;
+  display: flex; align-items: center; gap: 8px;
   transition: opacity 0.3s ease, transform 0.3s ease;
 }
-
-.pp-modal-counter {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  background: var(--pp-accent-subtle);
-  border: 1px solid var(--pp-accent-border);
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--pp-accent);
-  white-space: nowrap;
+.pp-top-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; background: var(--pp-glass-bg);
+  backdrop-filter: blur(28px) saturate(180%); -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid var(--pp-glass-border); border-radius: 50%; color: var(--pp-icon-color);
+  cursor: pointer; outline: none; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
-
-.pp-modal-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--pp-text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.pp-top-btn:hover {
+  background: var(--pp-glass-hover); border-color: var(--pp-glass-border-hover); color: #fff; transform: scale(1.08);
 }
 
 /* ============================================================
@@ -171,6 +161,42 @@ body.pp-cinema-active div.video-container {
   stroke: var(--pp-icon-color);
 }
 
+/* Sleek Apple TV+ Loading Spinner */
+.pp-cinema-spinner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  z-index: 25;
+  pointer-events: none;
+}
+.pp-cinema-spinner.show { display: flex; }
+.pp-spinner-ring {
+  width: 50px;
+  height: 50px;
+  border: 3.5px solid rgba(255, 255, 255, 0.14);
+  border-top-color: var(--pp-accent);
+  border-radius: 50%;
+  animation: ppSpin 0.75s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  box-shadow: 0 0 24px rgba(10, 132, 255, 0.35);
+}
+.pp-spinner-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--pp-text-secondary);
+  letter-spacing: 0.2px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 4px 14px;
+  border-radius: var(--pp-radius-pill);
+  background: rgba(0, 0, 0, 0.45);
+}
+@keyframes ppSpin { to { transform: rotate(360deg); } }
+
 /* Bottom Controls Overlay Scrim */
 .pp-player-controls {
   position: absolute;
@@ -189,7 +215,8 @@ body.pp-cinema-active div.video-container {
 }
 
 .pp-player-container.pp-inactive .pp-player-controls,
-.pp-player-container.pp-inactive .pp-modal-top-info {
+.pp-player-container.pp-inactive .pp-modal-top-info,
+.pp-player-container.pp-inactive .pp-modal-top-actions {
   opacity: 0;
   transform: translateY(12px);
   pointer-events: none;
@@ -435,11 +462,7 @@ body.pp-cinema-active div.video-container {
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65);
   z-index: 50;
 }
-
-.pp-dropdown-menu.show {
-  display: flex;
-}
-
+.pp-dropdown-menu.show { display: flex; }
 .pp-dropdown-item {
   padding: 7px 12px;
   border-radius: var(--pp-radius-sm);
@@ -452,14 +475,5 @@ body.pp-cinema-active div.video-container {
   justify-content: space-between;
   transition: all 0.15s ease;
 }
-
-.pp-dropdown-item:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
-}
-
-.pp-dropdown-item.active {
-  background: var(--pp-accent-subtle);
-  color: var(--pp-accent);
-  font-weight: 600;
-}
+.pp-dropdown-item:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+.pp-dropdown-item.active { background: var(--pp-accent-subtle); color: var(--pp-accent); font-weight: 600; }

@@ -16,7 +16,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const resultsSection = document.getElementById("results-section");
   const videoList = document.getElementById("video-list");
   const videoCountBadge = document.getElementById("video-count-badge");
-  const autoToolbarToggle = document.getElementById("auto-toolbar-toggle");
+  const autoCinemaToggle = document.getElementById("auto-cinema-toggle");
 
   let activeTab = null;
   let detectedShareId = null;

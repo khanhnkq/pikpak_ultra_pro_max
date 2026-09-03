@@ -26,7 +26,6 @@
       "player/player-template.js",
       "player/player.js",
       "content/network-interceptor.js",
-      "content/toolbar.js",
       "content/main.js",
     ];
 
@@ -56,7 +55,7 @@
     console.log(`%c[PikPak Injector] 📨 Forwarding to background: ${action}`, "color: #38bdf8;", payload);
 
     if (!chrome.runtime?.id) {
-      console.error("[PikPak Injector] ❌ Extension context is invalidated. Please reload the webpage (F5)!");
+      console.warn("[PikPak Injector] Extension context invalidated (Extension vừa reload). Cần F5 trang web.");
       window.postMessage(
         {
           source: BRIDGE_SOURCE_EXT,
@@ -68,30 +67,39 @@
       return;
     }
 
-    // Forward to Service Worker
-    chrome.runtime.sendMessage(
-      {
-        type: action,
-        payload: payload,
-      },
-      (response) => {
-        const lastErr = chrome.runtime.lastError;
-        if (lastErr) {
-          console.error("[PikPak Injector] ❌ chrome.runtime.lastError:", lastErr.message);
-        } else {
-          console.log(`%c[PikPak Injector] 📥 Background response for ${action}:`, "color: #4ade80;", response);
-        }
+    try {
+      chrome.runtime.sendMessage(
+        {
+          type: action,
+          payload: payload,
+        },
+        (response) => {
+          const lastErr = chrome.runtime.lastError;
+          if (lastErr) {
+            console.warn("[PikPak Injector] Runtime message warning:", lastErr.message);
+          }
 
-        window.postMessage(
-          {
-            source: BRIDGE_SOURCE_EXT,
-            requestId: requestId,
-            response: lastErr ? { success: false, error: lastErr.message } : response,
-          },
-          "*"
-        );
-      }
-    );
+          window.postMessage(
+            {
+              source: BRIDGE_SOURCE_EXT,
+              requestId: requestId,
+              response: lastErr ? { success: false, error: lastErr.message } : response,
+            },
+            "*"
+          );
+        }
+      );
+    } catch (err) {
+      console.warn("[PikPak Injector] Runtime send failed:", err.message);
+      window.postMessage(
+        {
+          source: BRIDGE_SOURCE_EXT,
+          requestId: requestId,
+          response: { success: false, error: "Extension context invalidated. Hãy F5 tải lại trang!" },
+        },
+        "*"
+      );
+    }
   });
 
   injectStyles();

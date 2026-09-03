@@ -14,10 +14,30 @@
           <span class="pp-modal-title" id="pp-modal-filename">Đang tải video...</span>
         </div>
 
+        <!-- Top Right Action Group: Download & Close -->
+        <div class="pp-modal-top-actions" id="pp-modal-top-actions">
+          <button id="pp-cinema-download-btn" class="pp-top-btn" title="Tải video gốc (Download)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" x2="12" y1="15" y2="3"/>
+            </svg>
+          </button>
+          <button id="pp-cinema-close-btn" class="pp-top-btn" title="Đóng Rạp Chiếu (Phím Esc)">
+            <span style="font-size: 16px; font-weight: 500; line-height: 1;">✕</span>
+          </button>
+        </div>
+
         <!-- Center Feedback HUD -->
         <div class="pp-center-hud" id="pp-center-hud">
           <div id="pp-center-hud-icon"></div>
           <span id="pp-center-hud-text"></span>
+        </div>
+
+        <!-- Center Loading Spinner -->
+        <div class="pp-cinema-spinner" id="pp-cinema-spinner">
+          <div class="pp-spinner-ring"></div>
+          <span class="pp-spinner-text" id="pp-spinner-text">Đang tải video...</span>
         </div>
 
         <!-- Custom HTML5 Video without native controls -->

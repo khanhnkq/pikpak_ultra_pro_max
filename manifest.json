@@ -57,7 +57,6 @@
         "player/player-template.js",
         "player/player.js",
         "content/network-interceptor.js",
-        "content/toolbar.js",
         "content/main.js",
         "lib/constants.js",
         "lib/md5.js",
