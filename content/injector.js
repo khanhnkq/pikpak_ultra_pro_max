@@ -17,23 +17,32 @@
     (document.head || document.documentElement).appendChild(link);
   }
 
-  // Inject player controller and main scripts into page execution context
+  // Inject modular player and content scripts in dependency order into page execution context
   function injectScripts() {
-    const playerScript = document.createElement("script");
-    playerScript.src = chrome.runtime.getURL("player/player.js");
-    playerScript.type = "text/javascript";
-    playerScript.onload = function () {
-      playerScript.remove();
+    const scripts = [
+      "player/icons.js",
+      "player/player-shortcuts.js",
+      "player/player-drawer.js",
+      "player/player-template.js",
+      "player/player.js",
+      "content/network-interceptor.js",
+      "content/toolbar.js",
+      "content/main.js",
+    ];
 
-      const mainScript = document.createElement("script");
-      mainScript.src = chrome.runtime.getURL("content/main.js");
-      mainScript.type = "text/javascript";
-      mainScript.onload = function () {
-        mainScript.remove();
+    function loadNext(idx) {
+      if (idx >= scripts.length) return;
+      const scriptEl = document.createElement("script");
+      scriptEl.src = chrome.runtime.getURL(scripts[idx]);
+      scriptEl.type = "text/javascript";
+      scriptEl.onload = function () {
+        scriptEl.remove();
+        loadNext(idx + 1);
       };
-      (document.head || document.documentElement).appendChild(mainScript);
-    };
-    (document.head || document.documentElement).appendChild(playerScript);
+      (document.head || document.documentElement).appendChild(scriptEl);
+    }
+
+    loadNext(0);
   }
 
   // Listen for messages from main.js (Page context)

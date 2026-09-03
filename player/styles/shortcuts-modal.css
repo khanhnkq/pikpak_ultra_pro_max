@@ -1,0 +1,82 @@
+/**
+ * PikPak Ultra Pro Max - Keyboard Shortcuts Modal Cheat Sheet
+ */
+
+#pp-shortcuts-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483648;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+#pp-shortcuts-modal.show {
+  display: flex;
+}
+
+.pp-shortcuts-dialog {
+  width: 90%;
+  max-width: 520px;
+  background: rgba(18, 20, 28, 0.95);
+  border: 1px solid var(--pp-glass-border);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75);
+  color: var(--pp-text-primary);
+  font-family: var(--pp-font);
+}
+
+.pp-shortcuts-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--pp-glass-border);
+  padding-bottom: 12px;
+}
+
+.pp-shortcuts-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--pp-text-primary);
+}
+
+.pp-shortcuts-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.pp-shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--pp-radius-sm);
+}
+
+.pp-shortcut-row span {
+  font-size: 12px;
+  color: var(--pp-text-secondary);
+}
+
+.pp-shortcut-row kbd {
+  display: inline-block;
+  padding: 3px 7px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--pp-glass-border);
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--pp-accent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}

@@ -1,0 +1,34 @@
+/**
+ * PikPak Ultra Pro Max - Tokens & Theme Variables
+ * Single Accent Palette, Unified Monochrome Icons, Zero Color Clutter
+ */
+
+:root {
+  /* Singular Primary Accent (Apple System Blue) */
+  --pp-accent: #0a84ff;
+  --pp-accent-hover: #0071e3;
+  --pp-accent-subtle: rgba(10, 132, 255, 0.12);
+  --pp-accent-border: rgba(10, 132, 255, 0.32);
+  --pp-accent-glow: rgba(10, 132, 255, 0.28);
+
+  /* Monochromatic Neutral Surfaces (macOS Liquid Glass) */
+  --pp-glass-bg: rgba(18, 20, 26, 0.65);
+  --pp-glass-hover: rgba(26, 30, 40, 0.85);
+  --pp-glass-border: rgba(255, 255, 255, 0.12);
+  --pp-glass-border-hover: rgba(255, 255, 255, 0.24);
+  --pp-glass-scrim: linear-gradient(to top, rgba(6, 8, 14, 0.94) 0%, rgba(6, 8, 14, 0.5) 60%, transparent 100%);
+
+  /* Typography & Icons - Unified Monochrome Hierarchy */
+  --pp-text-primary: #f5f5f7;
+  --pp-text-secondary: rgba(235, 235, 245, 0.65);
+  --pp-text-tertiary: rgba(235, 235, 245, 0.38);
+  --pp-icon-color: rgba(255, 255, 255, 0.88);
+  --pp-icon-hover: #ffffff;
+  --pp-icon-muted: rgba(255, 255, 255, 0.45);
+
+  /* Sizing & Radius */
+  --pp-radius-pill: 40px;
+  --pp-radius-md: 14px;
+  --pp-radius-sm: 8px;
+  --pp-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}

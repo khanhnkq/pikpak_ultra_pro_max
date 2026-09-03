@@ -49,9 +49,16 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "content/main.js",
-        "player/player.js",
         "player/player.css",
+        "player/styles/*.css",
+        "player/icons.js",
+        "player/player-shortcuts.js",
+        "player/player-drawer.js",
+        "player/player-template.js",
+        "player/player.js",
+        "content/network-interceptor.js",
+        "content/toolbar.js",
+        "content/main.js",
         "lib/constants.js",
         "lib/md5.js",
         "lib/pikpak-api.js"
