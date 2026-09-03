@@ -1,22 +1,21 @@
 /* PikPak Ultra Pro Max - Popup Theme */
 
 :root {
-  --bg-main: #0d1117;
-  --bg-card: #161b22;
-  --bg-card-hover: #21262d;
-  --border-color: #30363d;
-  --border-focus: #58a6ff;
-  --text-primary: #f0f6fc;
-  --text-secondary: #8b949e;
-  --accent-blue: #2f81f7;
-  --accent-blue-hover: #388bfd;
-  --accent-green: #238636;
-  --accent-green-hover: #2ea043;
-  --accent-orange: #d29922;
-  --accent-red: #f85149;
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
+  --bg-main: #0a0b10;
+  --bg-card: #14161f;
+  --bg-card-hover: #1c1e2a;
+  --border-color: rgba(255, 255, 255, 0.1);
+  --border-focus: #0a84ff;
+  --text-primary: #f5f5f7;
+  --text-secondary: rgba(235, 235, 245, 0.6);
+  --accent-blue: #0a84ff;
+  --accent-blue-hover: #0071e3;
+  --accent-blue-subtle: rgba(10, 132, 255, 0.12);
+  --accent-green: #30d158;
+  --accent-red: #ff453a;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
 }
 
 * {

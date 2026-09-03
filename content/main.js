@@ -226,8 +226,24 @@
     });
   }
 
+  // ====== 5b. Harvest Thumbnails from PikPak Preview Bar ======
+  function harvestPikPakThumbnails() {
+    const covers = document.querySelectorAll("#manager-preview-bar .player-file-cover, .file-list-box .file-list-item");
+    if (covers.length > 0 && currentPlaylist.length > 0) {
+      covers.forEach((el, idx) => {
+        const img = el.querySelector("img");
+        if (img && img.src && currentPlaylist[idx]) {
+          if (!currentPlaylist[idx].thumbnailLink || currentPlaylist[idx].thumbnailLink.length < 5) {
+            currentPlaylist[idx].thumbnailLink = img.src;
+          }
+        }
+      });
+    }
+  }
+
   const modalObserver = new MutationObserver(() => {
     suppressModals();
+    harvestPikPakThumbnails();
     checkAndAutoUnlock();
   });
   modalObserver.observe(document.documentElement, { childList: true, subtree: true });
@@ -337,7 +353,7 @@
         <option value="">Chất lượng...</option>
       </select>
 
-      <button id="pp-cinema-btn" class="pp-icon-btn btn-cinema" data-tooltip="Rạp Chiếu Video (Tua Full)">
+      <button id="pp-cinema-btn" class="pp-icon-btn" data-tooltip="Rạp Chiếu Video (Tua Full)">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect width="20" height="20" x="2" y="2" rx="2.18" ry="2.18"/>
           <line x1="7" x2="7" y1="2" y2="22"/>
@@ -350,7 +366,7 @@
         </svg>
       </button>
 
-      <button id="pp-download-btn" class="pp-icon-btn btn-download" data-tooltip="Tải video gốc" style="display: none;">
+      <button id="pp-download-btn" class="pp-icon-btn" data-tooltip="Tải video gốc" style="display: none;">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
           <polyline points="7 10 12 15 17 10"/>
@@ -358,8 +374,8 @@
         </svg>
       </button>
 
-      <button id="pp-close-cinema-btn" class="pp-icon-btn" data-tooltip="Đóng Rạp Chiếu (Phím Esc)" style="display: none; background: rgba(255, 59, 48, 0.25); border-color: rgba(255, 59, 48, 0.4); color: #ff453a;">
-        <span style="font-size: 15px; font-weight: bold; line-height: 1;">✕</span>
+      <button id="pp-close-cinema-btn" class="pp-icon-btn" data-tooltip="Đóng Rạp Chiếu (Phím Esc)" style="display: none;">
+        <span style="font-size: 15px; font-weight: 500; line-height: 1;">✕</span>
       </button>
     `;
 
@@ -517,13 +533,22 @@
     const currentVideo = document.querySelector("video:not(#pikpak-ultra-modal-video)");
     if (!currentVideo) return;
 
-    // Skip if already processed by modal
-    if (currentVideo.dataset.ppUnlocked === "true" || window.PikPakPlayer?.isModalOpen) {
+    // Skip if already processed, permanently failed, or modal is open
+    if (currentVideo.dataset.ppUnlocked === "true" || currentVideo.dataset.ppUnlocked === "failed" || window.PikPakPlayer?.isModalOpen) {
       return;
     }
 
     if (isAutoUnlocking) return;
     isAutoUnlocking = true;
+
+    const attempts = parseInt(currentVideo.dataset.ppAttempts || "0", 10);
+    currentVideo.dataset.ppAttempts = (attempts + 1).toString();
+    if (attempts >= 3) {
+      currentVideo.dataset.ppUnlocked = "failed";
+      isAutoUnlocking = false;
+      console.warn("[PikPak Ultra] Đã thử tự mở khóa 3 lần thất bại. Tạm dừng để tránh vòng lặp.");
+      return;
+    }
 
     console.log("%c[PikPak Ultra] 🤖 Phát hiện video! Mở Rạp Chiếu...", LOG_STYLE);
 
@@ -535,10 +560,14 @@
         try {
           const shareData = resolvedShareData || (await sendToExtension("RESOLVE_SHARE", { shareId, parentId }));
           resolvedShareData = shareData;
-          if (shareData?.videos) {
+          if (shareData?.videos && shareData.videos.length > 0) {
             currentPlaylist = shareData.videos;
+            const matchedIdx = currentPlaylist.findIndex((v) => v.id === parentId || v.id === shareData.targetFileId);
+            currentVideoIndex = matchedIdx !== -1 ? matchedIdx : 0;
           }
-        } catch (_) {}
+        } catch (e) {
+          console.warn("[PikPak Ultra] RESOLVE_SHARE:", e.message);
+        }
       }
 
       // Priority 1: Use direct stream URL intercepted from fetch/XHR
@@ -559,14 +588,14 @@
 
       // Priority 2: Use resolved playlist
       if (shareId && currentPlaylist.length > 0) {
-        currentVideoIndex = 0;
-        updateNavigationControls();
-        const targetVideo = currentPlaylist[0];
+        const playIdx = currentVideoIndex >= 0 ? currentVideoIndex : 0;
+        const targetVideo = currentPlaylist[playIdx];
         currentVideo.dataset.ppUnlocked = "true";
+        updateNavigationControls();
         await loadAndPlayFile(shareId, targetVideo.id);
       }
     } catch (err) {
-      console.warn("%c[PikPak Ultra] Auto-unlock:", LOG_STYLE, err.message);
+      console.warn("%c[PikPak Ultra] Auto-unlock error:", LOG_STYLE, err.message);
     } finally {
       isAutoUnlocking = false;
     }

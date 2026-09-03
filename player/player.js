@@ -37,6 +37,7 @@
     fullscreen: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><polyline points="21 15 21 21 15 21"/><polyline points="3 9 3 3 9 3"/></svg>`,
     exitFullscreen: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><polyline points="14 20 14 14 20 14"/><polyline points="10 4 10 10 4 10"/></svg>`,
     keyboard: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 16h10"/></svg>`,
+    playlist: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>`,
   };
 
   class VideoStreamController {
@@ -210,6 +211,12 @@
             this.toggleShortcutsModal();
             break;
 
+          case "e":
+          case "E":
+            e.preventDefault();
+            this.togglePlaylistDrawer();
+            break;
+
           default:
             // Number keys 0 - 9 seek to 0% - 90%
             if (e.key >= "0" && e.key <= "9") {
@@ -334,6 +341,24 @@
             crossorigin="anonymous"
           ></video>
 
+          <!-- Bottom Video Thumbnail Carousel Drawer -->
+          <div class="pp-playlist-drawer" id="pp-playlist-drawer">
+            <div class="pp-drawer-header">
+              <div class="pp-drawer-title">
+                ${ICONS.playlist}
+                <span>Danh sách video</span>
+                <span class="pp-drawer-count" id="pp-drawer-count">1 / 1</span>
+              </div>
+              <button class="pp-drawer-close" id="pp-drawer-close" title="Đóng (Phím E hoặc Esc)">✕</button>
+            </div>
+
+            <div class="pp-drawer-body">
+              <button class="pp-drawer-arrow left" id="pp-drawer-prev-scroll" title="Cuộn lùi">‹</button>
+              <div class="pp-drawer-scroll-track" id="pp-drawer-scroll-track"></div>
+              <button class="pp-drawer-arrow right" id="pp-drawer-next-scroll" title="Cuộn tới">›</button>
+            </div>
+          </div>
+
           <!-- Bottom Controls Overlay Scrim -->
           <div class="pp-player-controls" id="pp-player-controls">
             <!-- Scrubber / Progress Bar -->
@@ -383,6 +408,11 @@
 
               <!-- Right Group -->
               <div class="pp-controls-group">
+                <!-- Playlist Carousel Drawer Button -->
+                <button id="pp-ctrl-playlist" class="pp-ctrl-btn" title="Danh sách tập (Phím E)">
+                  ${ICONS.playlist}
+                </button>
+
                 <!-- Speed Menu -->
                 <div class="pp-menu-wrap">
                   <button id="pp-speed-btn" class="pp-menu-btn" title="Tốc độ phát">
@@ -443,6 +473,7 @@
               <div class="pp-shortcut-row"><span>Giảm âm lượng 10%</span><kbd>↓</kbd></div>
               <div class="pp-shortcut-row"><span>Tắt / Bật tiếng</span><kbd>M</kbd></div>
               <div class="pp-shortcut-row"><span>Toàn màn hình</span><kbd>F</kbd></div>
+              <div class="pp-shortcut-row"><span>Bật danh sách tập</span><kbd>E</kbd></div>
               <div class="pp-shortcut-row"><span>Video tiếp theo</span><kbd>] / N</kbd></div>
               <div class="pp-shortcut-row"><span>Video trước</span><kbd>[ / P</kbd></div>
               <div class="pp-shortcut-row"><span>Tăng / Giảm tốc độ</span><kbd>&gt; / &lt;</kbd></div>
@@ -629,6 +660,30 @@
         if (qMenu) qMenu.classList.remove("show");
       });
 
+      // 10b. Playlist drawer toggle & scroll
+      const playlistBtn = document.getElementById("pp-ctrl-playlist");
+      const drawerClose = document.getElementById("pp-drawer-close");
+      const prevScroll = document.getElementById("pp-drawer-prev-scroll");
+      const nextScroll = document.getElementById("pp-drawer-next-scroll");
+      const scrollTrack = document.getElementById("pp-drawer-scroll-track");
+
+      if (playlistBtn) {
+        playlistBtn.addEventListener("click", () => this.togglePlaylistDrawer());
+      }
+      if (drawerClose) {
+        drawerClose.addEventListener("click", () => this.togglePlaylistDrawer(false));
+      }
+      if (prevScroll && scrollTrack) {
+        prevScroll.addEventListener("click", () => {
+          scrollTrack.scrollBy({ left: -320, behavior: "smooth" });
+        });
+      }
+      if (nextScroll && scrollTrack) {
+        nextScroll.addEventListener("click", () => {
+          scrollTrack.scrollBy({ left: 320, behavior: "smooth" });
+        });
+      }
+
       // 11. PiP button
       document.getElementById("pp-ctrl-pip").addEventListener("click", () => {
         if (document.pictureInPictureElement) {
@@ -696,6 +751,47 @@
       }
 
       if (topInfo) topInfo.style.display = "flex";
+
+      // Render Thumbnail Carousel Cards
+      const scrollTrack = document.getElementById("pp-drawer-scroll-track");
+      const drawerCount = document.getElementById("pp-drawer-count");
+      if (scrollTrack && options.playlist && options.playlist.length > 0) {
+        if (drawerCount) drawerCount.textContent = `${options.currentIndex + 1} / ${options.playlist.length}`;
+
+        scrollTrack.innerHTML = options.playlist
+          .map((v, i) => {
+            const isCur = i === options.currentIndex;
+            const thumb = v.thumbnailLink || "";
+            return `
+              <div class="pp-thumb-card ${isCur ? "active" : ""}" data-index="${i}">
+                ${thumb ? `<img src="${thumb}" class="pp-thumb-img" loading="lazy" />` : `<div class="pp-thumb-fallback">${ICONS.play}</div>`}
+                <div class="pp-thumb-overlay">
+                  ${isCur ? `<span class="pp-thumb-badge">Đang phát</span>` : ""}
+                  <span class="pp-thumb-idx">#${i + 1}</span>
+                  <span class="pp-thumb-name" title="${v.name}">${v.name}</span>
+                </div>
+              </div>
+            `;
+          })
+          .join("");
+
+        scrollTrack.querySelectorAll(".pp-thumb-card").forEach((card) => {
+          card.addEventListener("click", () => {
+            const idx = parseInt(card.dataset.index, 10);
+            if (!isNaN(idx) && this.navigationHandlers?.onSelect) {
+              this.navigationHandlers.onSelect(idx);
+            }
+          });
+        });
+
+        // Scroll active card into view smoothly
+        setTimeout(() => {
+          const activeCard = scrollTrack.querySelector(".pp-thumb-card.active");
+          if (activeCard) {
+            activeCard.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+          }
+        }, 120);
+      }
 
       // Populate Qualities menu if multiple streams
       const qualityWrap = document.getElementById("pp-quality-wrap");
@@ -787,7 +883,27 @@
       const closeBtn = document.getElementById("pp-close-cinema-btn");
       if (closeBtn) closeBtn.style.display = "none";
 
+      this.togglePlaylistDrawer(false);
+
       console.log("[PikPak Ultra] Cinema Modal Player đã đóng.");
+    }
+
+    togglePlaylistDrawer(forceState) {
+      const drawer = document.getElementById("pp-playlist-drawer");
+      const btn = document.getElementById("pp-ctrl-playlist");
+      if (!drawer) return;
+
+      const shouldShow = typeof forceState === "boolean" ? forceState : !drawer.classList.contains("show");
+      drawer.classList.toggle("show", shouldShow);
+      if (btn) btn.classList.toggle("active", shouldShow);
+
+      if (shouldShow) {
+        const scrollTrack = document.getElementById("pp-drawer-scroll-track");
+        const activeCard = scrollTrack?.querySelector(".pp-thumb-card.active");
+        if (activeCard) {
+          activeCard.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+        }
+      }
     }
 
     changeSource(newUrl) {

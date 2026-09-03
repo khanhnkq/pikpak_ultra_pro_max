@@ -1,54 +1,69 @@
 /**
- * PikPak Ultra Pro Max - Floating UI & Player Styles
- * Premium glassmorphic interface for seamless control overlay
+ * PikPak Ultra Pro Max - Unified Design System & Player Styles
+ * Philosophy: macOS / Apple VisionOS Native Glassmorphism
+ * Single Accent Palette, Unified Monochrome Icons, Zero Color Clutter
  */
 
 :root {
-  --pp-primary: #007aff;
-  --pp-primary-glow: rgba(0, 122, 255, 0.45);
-  --pp-success: #34c759;
-  --pp-success-glow: rgba(52, 199, 89, 0.45);
-  --pp-warning: #ff9500;
-  --pp-danger: #ff3b30;
-  --pp-bg-glass: rgba(18, 22, 32, 0.88);
-  --pp-bg-glass-hover: rgba(28, 34, 48, 0.95);
-  --pp-border: rgba(255, 255, 255, 0.14);
-  --pp-text: #ffffff;
-  --pp-text-muted: #9ba1b0;
-  --pp-radius: 12px;
-  --pp-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  /* Singular Primary Accent (Apple System Blue) */
+  --pp-accent: #0a84ff;
+  --pp-accent-hover: #0071e3;
+  --pp-accent-subtle: rgba(10, 132, 255, 0.12);
+  --pp-accent-border: rgba(10, 132, 255, 0.32);
+  --pp-accent-glow: rgba(10, 132, 255, 0.28);
+
+  /* Monochromatic Neutral Surfaces (macOS Liquid Glass) */
+  --pp-glass-bg: rgba(18, 20, 26, 0.65);
+  --pp-glass-hover: rgba(26, 30, 40, 0.85);
+  --pp-glass-border: rgba(255, 255, 255, 0.12);
+  --pp-glass-border-hover: rgba(255, 255, 255, 0.24);
+  --pp-glass-scrim: linear-gradient(to top, rgba(6, 8, 14, 0.94) 0%, rgba(6, 8, 14, 0.5) 60%, transparent 100%);
+
+  /* Typography & Icons - Unified Monochrome Hierarchy */
+  --pp-text-primary: #f5f5f7;
+  --pp-text-secondary: rgba(235, 235, 245, 0.65);
+  --pp-text-tertiary: rgba(235, 235, 245, 0.38);
+  --pp-icon-color: rgba(255, 255, 255, 0.88);
+  --pp-icon-hover: #ffffff;
+  --pp-icon-muted: rgba(255, 255, 255, 0.45);
+
+  /* Sizing & Radius */
+  --pp-radius-pill: 40px;
+  --pp-radius-md: 14px;
+  --pp-radius-sm: 8px;
+  --pp-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 /* ============================================================
-   Floating Glass Dock Toolbar (Thanh Nổi Trong Suốt Icon Dock)
-   Thiết kế phong cách Liquid Glass macOS, siêu nhẹ, không che khuất web
+   1. Floating Glass Capsule Dock (Thanh Nổi Trong Suốt)
+   Đồng bộ tối giản, không màu mè, chuẩn macOS Native
    ============================================================ */
 
 #pikpak-ultra-toolbar {
   position: fixed;
   top: 16px;
   right: 20px;
-  z-index: 2147483647 !important; /* Luôn nằm trên cùng, không bao giờ bị video che */
+  z-index: 2147483647 !important; /* Luôn nổi trên cùng, không bao giờ bị video che */
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 5px 8px;
-  background: rgba(15, 20, 30, 0.45);
-  backdrop-filter: blur(25px) saturate(190%);
-  -webkit-backdrop-filter: blur(25px) saturate(190%);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 40px;
-  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  background: var(--pp-glass-bg);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid var(--pp-glass-border);
+  border-radius: var(--pp-radius-pill);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.15);
   font-family: var(--pp-font);
-  color: var(--pp-text);
+  color: var(--pp-text-primary);
   user-select: none;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 #pikpak-ultra-toolbar:hover {
-  background: rgba(18, 24, 38, 0.68);
-  border-color: rgba(255, 255, 255, 0.28);
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55), 0 0 24px rgba(0, 122, 255, 0.25);
+  background: var(--pp-glass-hover);
+  border-color: var(--pp-glass-border-hover);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55), 0 0 20px var(--pp-accent-glow);
 }
 
 /* Status Indicator Orb */
@@ -60,27 +75,27 @@
 }
 
 .pp-status-orb {
-  width: 9px;
-  height: 9px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: #ff9500;
-  box-shadow: 0 0 10px #ff9500;
+  background: var(--pp-accent);
+  box-shadow: 0 0 8px var(--pp-accent-glow);
   transition: all 0.3s ease;
 }
 
 .pp-status-orb.active {
-  background: #34c759;
-  box-shadow: 0 0 12px #34c759, 0 0 4px #fff;
-  animation: pp-pulse 2.2s infinite;
+  background: var(--pp-accent);
+  box-shadow: 0 0 10px var(--pp-accent), 0 0 2px #fff;
+  animation: pp-pulse 2.4s infinite;
 }
 
 @keyframes pp-pulse {
   0% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.15); opacity: 0.85; }
+  50% { transform: scale(1.18); opacity: 0.85; }
   100% { transform: scale(1); opacity: 1; }
 }
 
-/* Round Icon Buttons */
+/* Unified Round Icon Buttons */
 .pp-icon-btn {
   position: relative;
   display: inline-flex;
@@ -89,19 +104,20 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--pp-glass-border);
   background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
+  color: var(--pp-icon-color);
   cursor: pointer;
   outline: none;
   padding: 0;
-  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .pp-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.3);
-  transform: translateY(-1px) scale(1.06);
+  background: rgba(255, 255, 255, 0.18);
+  border-color: var(--pp-glass-border-hover);
+  color: var(--pp-icon-hover);
+  transform: translateY(-1px) scale(1.05);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
 }
 
@@ -109,47 +125,23 @@
   transform: translateY(0) scale(0.96);
 }
 
-/* Specific button themes */
-.pp-icon-btn.btn-unlock {
-  background: linear-gradient(135deg, rgba(0, 122, 255, 0.35), rgba(0, 86, 204, 0.5));
-  border-color: rgba(0, 122, 255, 0.4);
+.pp-icon-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
-.pp-icon-btn.btn-unlock:hover {
-  background: linear-gradient(135deg, rgba(0, 140, 255, 0.55), rgba(0, 100, 230, 0.7));
-  box-shadow: 0 0 16px var(--pp-primary-glow);
+.pp-icon-btn.active {
+  background: var(--pp-accent-subtle);
+  border-color: var(--pp-accent-border);
+  color: var(--pp-accent);
 }
 
-.pp-icon-btn.btn-unlocked-active {
-  background: linear-gradient(135deg, rgba(52, 199, 89, 0.4), rgba(40, 167, 69, 0.6)) !important;
-  border-color: rgba(52, 199, 89, 0.5) !important;
-  box-shadow: 0 0 14px var(--pp-success-glow);
-}
-
-.pp-icon-btn.btn-cinema {
-  background: linear-gradient(135deg, rgba(175, 82, 222, 0.35), rgba(88, 86, 214, 0.5));
-  border-color: rgba(175, 82, 222, 0.45);
-}
-
-.pp-icon-btn.btn-cinema:hover {
-  background: linear-gradient(135deg, rgba(190, 100, 240, 0.55), rgba(105, 100, 230, 0.7));
-  box-shadow: 0 0 18px rgba(175, 82, 222, 0.5);
-}
-
-.pp-icon-btn.btn-download {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.pp-icon-btn.btn-download:hover {
-  background: rgba(255, 255, 255, 0.22);
-  color: #38bdf8;
-}
-
-/* Glass dropdown selects */
+/* Unified Dropdown Selects */
 .pp-select {
-  background: rgba(15, 20, 30, 0.6);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--pp-text-primary);
+  border: 1px solid var(--pp-glass-border);
   border-radius: 20px;
   padding: 6px 12px;
   font-size: 12px;
@@ -157,7 +149,7 @@
   font-weight: 500;
   outline: none;
   cursor: pointer;
-  max-width: 150px;
+  max-width: 160px;
   text-overflow: ellipsis;
   backdrop-filter: blur(15px);
   -webkit-backdrop-filter: blur(15px);
@@ -165,12 +157,12 @@
 }
 
 .pp-select:hover {
-  background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.15);
+  border-color: var(--pp-glass-border-hover);
 }
 
 .pp-select option {
-  background: #111622;
+  background: #14161f;
   color: #fff;
 }
 
@@ -182,11 +174,11 @@
   left: 50%;
   transform: translateX(-50%) translateY(4px);
   padding: 4px 8px;
-  background: rgba(10, 14, 22, 0.92);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(12, 14, 20, 0.94);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--pp-glass-border);
   border-radius: 6px;
-  color: #fff;
+  color: var(--pp-text-primary);
   font-size: 11px;
   font-weight: 500;
   white-space: nowrap;
@@ -207,17 +199,17 @@
   position: fixed;
   bottom: 24px;
   right: 24px;
-  z-index: 999999999;
+  z-index: 2147483647;
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 12px 18px;
-  background: var(--pp-bg-glass);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--pp-border);
-  border-radius: var(--pp-radius);
-  color: #fff;
+  background: var(--pp-glass-bg);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--pp-glass-border);
+  border-radius: var(--pp-radius-md);
+  color: var(--pp-text-primary);
   font-family: var(--pp-font);
   font-size: 13px;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
@@ -234,23 +226,11 @@
 }
 
 #pikpak-ultra-toast.error {
-  border-color: rgba(255, 59, 48, 0.5);
-  box-shadow: 0 12px 36px rgba(255, 59, 48, 0.25);
-}
-
-/* Custom Player Container replacement */
-.pikpak-ultra-video-active {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: contain !important;
-  background-color: #000 !important;
-  border-radius: 6px;
-  z-index: 10;
+  border-color: rgba(255, 59, 48, 0.4);
 }
 
 /* ============================================================
-   Dedicated Cinema Modal Video Player (Rạp Chiếu Video Độc Lập)
-   Hoàn toàn độc lập khỏi giao diện & thanh tua 30s của PikPak
+   2. Dedicated Cinema Modal Video Player
    ============================================================ */
 
 #pikpak-ultra-cinema-modal {
@@ -258,9 +238,9 @@
   inset: 0;
   z-index: 2147483640 !important; /* Dưới toolbar (2147483647) để toolbar luôn nổi lên trên video */
   display: flex;
-  background: rgba(5, 7, 12, 0.96);
-  backdrop-filter: blur(30px);
-  -webkit-backdrop-filter: blur(30px);
+  background: rgba(4, 5, 8, 0.98);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1);
@@ -273,10 +253,7 @@
   pointer-events: auto;
 }
 
-/* ============================================================
-   Tối ưu hiệu năng: Ẩn triệt để video gốc của PikPak ở nền
-   Ngăn chặn Render 2 layer video gây tốn GPU / RAM / Băng thông
-   ============================================================ */
+/* Tối ưu hiệu năng: Ẩn triệt để video gốc của PikPak ở nền */
 body.pp-cinema-active video:not(#pikpak-ultra-modal-video) {
   display: none !important;
   visibility: hidden !important;
@@ -304,12 +281,12 @@ body.pp-cinema-active [class*="player-container"] {
   align-items: center;
   gap: 10px;
   padding: 6px 14px;
-  background: rgba(15, 20, 30, 0.55);
-  backdrop-filter: blur(25px) saturate(190%);
-  -webkit-backdrop-filter: blur(25px) saturate(190%);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 40px;
-  color: #fff;
+  background: var(--pp-glass-bg);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid var(--pp-glass-border);
+  border-radius: var(--pp-radius-pill);
+  color: var(--pp-text-primary);
   font-size: 13px;
   font-weight: 600;
   max-width: 45vw;
@@ -318,34 +295,34 @@ body.pp-cinema-active [class*="player-container"] {
   white-space: nowrap;
   user-select: none;
   pointer-events: none;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 .pp-modal-counter {
   display: inline-flex;
   align-items: center;
   padding: 2px 8px;
-  background: rgba(56, 189, 248, 0.2);
-  border: 1px solid rgba(56, 189, 248, 0.4);
+  background: var(--pp-accent-subtle);
+  border: 1px solid var(--pp-accent-border);
   border-radius: 12px;
   font-size: 11px;
   font-weight: 700;
-  color: #38bdf8;
+  color: var(--pp-accent);
   white-space: nowrap;
 }
 
 .pp-modal-title {
   font-size: 13px;
   font-weight: 600;
-  color: #fff;
+  color: var(--pp-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 /* ============================================================
-   Custom Video Player UI Engine (Giao diện Video Player Cao Cấp)
-   Thiết kế phong cách Apple TV+ & Netflix với đầy đủ điều khiển
+   3. Custom Video Player UI Engine
    ============================================================ */
 
 .pp-player-container {
@@ -374,7 +351,7 @@ body.pp-cinema-active [class*="player-container"] {
   outline: none;
 }
 
-/* Center Play/Pause & Feedback HUD */
+/* Center HUD Feedback */
 .pp-center-hud {
   position: absolute;
   top: 50%;
@@ -387,17 +364,17 @@ body.pp-cinema-active [class*="player-container"] {
   gap: 8px;
   min-width: 90px;
   padding: 16px 22px;
-  background: rgba(15, 20, 32, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(14, 16, 22, 0.86);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--pp-glass-border);
   border-radius: 20px;
-  color: #fff;
+  color: var(--pp-text-primary);
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   pointer-events: none;
   opacity: 0;
-  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
   z-index: 20;
 }
@@ -408,9 +385,10 @@ body.pp-cinema-active [class*="player-container"] {
 }
 
 .pp-center-hud svg {
-  width: 32px;
-  height: 32px;
-  stroke: #38bdf8;
+  width: 30px;
+  height: 30px;
+  fill: var(--pp-icon-color);
+  stroke: var(--pp-icon-color);
 }
 
 /* Bottom Controls Overlay Scrim */
@@ -420,13 +398,13 @@ body.pp-cinema-active [class*="player-container"] {
   left: 0;
   right: 0;
   padding: 40px 24px 18px 24px;
-  background: linear-gradient(to top, rgba(5, 7, 12, 0.95) 0%, rgba(5, 7, 12, 0.65) 60%, transparent 100%);
+  background: var(--pp-glass-scrim);
   display: flex;
   flex-direction: column;
   gap: 12px;
   opacity: 1;
   transform: translateY(0);
-  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1), transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
   z-index: 30;
 }
 
@@ -453,7 +431,7 @@ body.pp-cinema-active [class*="player-container"] {
   height: 5px;
   background: rgba(255, 255, 255, 0.2);
   border-radius: 5px;
-  transition: height 0.18s ease;
+  transition: height 0.16s ease;
   overflow: visible;
 }
 
@@ -467,7 +445,7 @@ body.pp-cinema-active [class*="player-container"] {
   left: 0;
   height: 100%;
   width: 0%;
-  background: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.25);
   border-radius: 5px;
   transition: width 0.15s ease-out;
 }
@@ -478,9 +456,9 @@ body.pp-cinema-active [class*="player-container"] {
   left: 0;
   height: 100%;
   width: 0%;
-  background: linear-gradient(90deg, #007aff, #00d2ff);
+  background: var(--pp-accent);
   border-radius: 5px;
-  box-shadow: 0 0 10px rgba(0, 122, 255, 0.8);
+  box-shadow: 0 0 10px var(--pp-accent-glow);
 }
 
 .pp-progress-thumb {
@@ -492,7 +470,7 @@ body.pp-cinema-active [class*="player-container"] {
   height: 14px;
   border-radius: 50%;
   background: #ffffff;
-  box-shadow: 0 0 10px #00d2ff, 0 0 3px rgba(0,0,0,0.5);
+  box-shadow: 0 0 8px var(--pp-accent-glow), 0 1px 3px rgba(0, 0, 0, 0.5);
   transition: transform 0.15s ease;
 }
 
@@ -508,17 +486,17 @@ body.pp-cinema-active [class*="player-container"] {
   left: 0;
   transform: translateX(-50%);
   padding: 4px 8px;
-  background: rgba(15, 20, 32, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(14, 16, 22, 0.95);
+  border: 1px solid var(--pp-glass-border);
   border-radius: 6px;
-  color: #fff;
+  color: var(--pp-text-primary);
   font-size: 11px;
   font-weight: 600;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.15s ease;
   white-space: nowrap;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
 }
 
 .pp-progress-area:hover .pp-scrub-tooltip {
@@ -539,7 +517,7 @@ body.pp-cinema-active [class*="player-container"] {
   gap: 8px;
 }
 
-/* Control Buttons */
+/* Control Action Buttons */
 .pp-ctrl-btn {
   display: inline-flex;
   align-items: center;
@@ -549,7 +527,7 @@ body.pp-cinema-active [class*="player-container"] {
   border-radius: 50%;
   border: none;
   background: transparent;
-  color: #ffffff;
+  color: var(--pp-icon-color);
   cursor: pointer;
   outline: none;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -557,12 +535,13 @@ body.pp-cinema-active [class*="player-container"] {
 }
 
 .pp-ctrl-btn:hover {
-  background: rgba(255, 255, 255, 0.16);
-  transform: scale(1.1);
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--pp-icon-hover);
+  transform: scale(1.08);
 }
 
 .pp-ctrl-btn:active {
-  transform: scale(0.95);
+  transform: scale(0.96);
 }
 
 .pp-ctrl-btn svg {
@@ -611,7 +590,7 @@ body.pp-cinema-active [class*="player-container"] {
   border-radius: 50%;
   background: #ffffff;
   cursor: pointer;
-  box-shadow: 0 0 6px rgba(0,0,0,0.5);
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
 }
 
 /* Time Display */
@@ -621,14 +600,14 @@ body.pp-cinema-active [class*="player-container"] {
   gap: 4px;
   font-size: 13px;
   font-weight: 500;
-  color: #d1d5db;
+  color: var(--pp-text-secondary);
   font-variant-numeric: tabular-nums;
   margin-left: 6px;
   user-select: none;
 }
 
 .pp-time-current {
-  color: #ffffff;
+  color: var(--pp-text-primary);
   font-weight: 600;
 }
 
@@ -643,9 +622,9 @@ body.pp-cinema-active [class*="player-container"] {
   gap: 4px;
   padding: 6px 12px;
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid var(--pp-glass-border);
   background: rgba(255, 255, 255, 0.08);
-  color: #fff;
+  color: var(--pp-icon-color);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -654,25 +633,26 @@ body.pp-cinema-active [class*="player-container"] {
 }
 
 .pp-menu-btn:hover {
-  background: rgba(255, 255, 255, 0.18);
-  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.16);
+  border-color: var(--pp-glass-border-hover);
+  color: #fff;
 }
 
 .pp-dropdown-menu {
   position: absolute;
   bottom: 45px;
   right: 0;
-  background: rgba(15, 20, 32, 0.95);
-  backdrop-filter: blur(25px);
-  -webkit-backdrop-filter: blur(25px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 12px;
+  background: rgba(16, 18, 26, 0.94);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid var(--pp-glass-border);
+  border-radius: var(--pp-radius-md);
   padding: 6px;
   display: none;
   flex-direction: column;
   gap: 2px;
   min-width: 120px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65);
   z-index: 50;
 }
 
@@ -682,8 +662,8 @@ body.pp-cinema-active [class*="player-container"] {
 
 .pp-dropdown-item {
   padding: 7px 12px;
-  border-radius: 8px;
-  color: #e2e8f0;
+  border-radius: var(--pp-radius-sm);
+  color: var(--pp-text-secondary);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
@@ -694,13 +674,14 @@ body.pp-cinema-active [class*="player-container"] {
 }
 
 .pp-dropdown-item:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.1);
   color: #fff;
 }
 
 .pp-dropdown-item.active {
-  color: #38bdf8;
-  font-weight: 700;
+  background: var(--pp-accent-subtle);
+  color: var(--pp-accent);
+  font-weight: 600;
 }
 
 /* Keyboard Shortcuts Cheat Sheet Modal */
@@ -711,9 +692,9 @@ body.pp-cinema-active [class*="player-container"] {
   display: none;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 #pp-shortcuts-modal.show {
@@ -723,12 +704,12 @@ body.pp-cinema-active [class*="player-container"] {
 .pp-shortcuts-dialog {
   width: 90%;
   max-width: 520px;
-  background: rgba(18, 24, 38, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(18, 20, 28, 0.95);
+  border: 1px solid var(--pp-glass-border);
   border-radius: 20px;
   padding: 24px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
-  color: #fff;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75);
+  color: var(--pp-text-primary);
   font-family: var(--pp-font);
 }
 
@@ -737,7 +718,7 @@ body.pp-cinema-active [class*="player-container"] {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--pp-glass-border);
   padding-bottom: 12px;
 }
 
@@ -748,38 +729,249 @@ body.pp-cinema-active [class*="player-container"] {
   display: flex;
   align-items: center;
   gap: 8px;
+  color: var(--pp-text-primary);
 }
 
 .pp-shortcuts-list {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 10px;
 }
 
 .pp-shortcut-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 10px;
+  padding: 8px 12px;
   background: rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
+  border-radius: var(--pp-radius-sm);
 }
 
 .pp-shortcut-row span {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--pp-text-secondary);
 }
 
 .pp-shortcut-row kbd {
   display: inline-block;
-  padding: 2px 6px;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 3px 7px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--pp-glass-border);
   border-radius: 4px;
   font-size: 11px;
   font-weight: 700;
-  color: #38bdf8;
-  font-family: monospace;
+  color: var(--pp-accent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
+/* ============================================================
+   4. Bottom Video Thumbnail Carousel Drawer (Danh Sách Tập PikPak)
+   ============================================================ */
 
+.pp-playlist-drawer {
+  position: absolute;
+  bottom: 84px; /* Nằm ngay trên thanh điều khiển */
+  left: 20px;
+  right: 20px;
+  background: rgba(14, 16, 24, 0.94);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid var(--pp-glass-border);
+  border-radius: var(--pp-radius-md);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.75);
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px;
+  gap: 10px;
+  z-index: 40;
+  opacity: 0;
+  transform: translateY(20px);
+  pointer-events: none;
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pp-playlist-drawer.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.pp-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+
+.pp-drawer-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pp-text-primary);
+}
+
+.pp-drawer-count {
+  padding: 2px 8px;
+  background: var(--pp-accent-subtle);
+  border: 1px solid var(--pp-accent-border);
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--pp-accent);
+}
+
+.pp-drawer-close {
+  background: transparent;
+  border: none;
+  color: var(--pp-text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease;
+}
+
+.pp-drawer-close:hover {
+  color: #fff;
+}
+
+.pp-drawer-body {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.pp-drawer-scroll-track {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  width: 100%;
+  padding: 4px 2px;
+}
+
+.pp-drawer-scroll-track::-webkit-scrollbar {
+  height: 4px;
+}
+
+.pp-drawer-scroll-track::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+/* Individual Thumbnail Card */
+.pp-thumb-card {
+  flex: 0 0 150px;
+  height: 88px;
+  position: relative;
+  border-radius: var(--pp-radius-sm);
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid var(--pp-glass-border);
+  background: #10121a;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.pp-thumb-card:hover {
+  transform: translateY(-3px) scale(1.03);
+  border-color: var(--pp-glass-border-hover);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+}
+
+.pp-thumb-card.active {
+  border: 2px solid var(--pp-accent);
+  box-shadow: 0 0 16px var(--pp-accent-glow);
+}
+
+.pp-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pp-thumb-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #181c28, #0e1018);
+  color: var(--pp-accent);
+}
+
+.pp-thumb-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, transparent 60%);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 6px 8px;
+}
+
+.pp-thumb-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  padding: 2px 6px;
+  background: var(--pp-accent);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.pp-thumb-idx {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  padding: 2px 5px;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 4px;
+}
+
+.pp-thumb-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pp-drawer-arrow {
+  flex: 0 0 28px;
+  height: 88px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--pp-glass-border);
+  border-radius: var(--pp-radius-sm);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 18px;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.pp-drawer-arrow:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--pp-accent);
+}
