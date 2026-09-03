@@ -244,6 +244,15 @@
   const modalObserver = new MutationObserver(() => {
     suppressModals();
     harvestPikPakThumbnails();
+    if (window.PikPakPlayer?.isModalOpen) {
+      document.querySelectorAll("video:not(#pikpak-ultra-modal-video)").forEach((v) => {
+        try {
+          if (!v.paused) v.pause();
+          v.muted = true;
+          v.volume = 0;
+        } catch (_) {}
+      });
+    }
     checkAndAutoUnlock();
   });
   modalObserver.observe(document.documentElement, { childList: true, subtree: true });
@@ -551,6 +560,10 @@
     }
 
     console.log("%c[PikPak Ultra] 🤖 Phát hiện video! Mở Rạp Chiếu...", LOG_STYLE);
+    try {
+      currentVideo.muted = true;
+      currentVideo.volume = 0;
+    } catch (_) {}
 
     try {
       const { shareId, parentId } = getShareContext();
@@ -602,9 +615,27 @@
   }
 
   function applyDirectStream(url, meta = {}) {
+    isUnlocked = true;
     console.log("%c[PikPak Ultra] 📺 Khởi chạy Cinema Modal Player:", LOG_SUCCESS, {
       url: url,
       meta: meta,
+    });
+
+    // Lập tức ngắt tiếng và dừng hoàn toàn video gốc của PikPak
+    document.querySelectorAll("video:not(#pikpak-ultra-modal-video)").forEach((v) => {
+      try {
+        v.pause();
+        v.muted = true;
+        v.volume = 0;
+        v.style.display = "none";
+        v.onplay = () => {
+          if (window.PikPakPlayer?.isModalOpen) {
+            v.pause();
+            v.muted = true;
+            v.volume = 0;
+          }
+        };
+      } catch (_) {}
     });
 
     const downloadBtn = document.getElementById("pp-download-btn");

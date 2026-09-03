@@ -253,7 +253,7 @@
   pointer-events: auto;
 }
 
-/* Tối ưu hiệu năng: Ẩn triệt để video gốc của PikPak ở nền */
+/* Tối ưu hiệu năng: Ẩn triệt để video gốc của PikPak ở nền (NGOẠI TRỪ modal player của extension) */
 body.pp-cinema-active video:not(#pikpak-ultra-modal-video) {
   display: none !important;
   visibility: hidden !important;
@@ -263,12 +263,19 @@ body.pp-cinema-active video:not(#pikpak-ultra-modal-video) {
   pointer-events: none !important;
 }
 
-body.pp-cinema-active [class*="video-player"],
-body.pp-cinema-active [class*="preview-player"],
-body.pp-cinema-active [class*="dplayer"],
-body.pp-cinema-active [class*="artplayer"],
-body.pp-cinema-active [class*="player-container"] {
+body.pp-cinema-active [class*="video-player"]:not(#pikpak-ultra-cinema-modal):not(#pikpak-ultra-cinema-modal *),
+body.pp-cinema-active [class*="preview-player"]:not(#pikpak-ultra-cinema-modal):not(#pikpak-ultra-cinema-modal *),
+body.pp-cinema-active [class*="dplayer"]:not(#pikpak-ultra-cinema-modal):not(#pikpak-ultra-cinema-modal *),
+body.pp-cinema-active [class*="artplayer"]:not(#pikpak-ultra-cinema-modal):not(#pikpak-ultra-cinema-modal *),
+body.pp-cinema-active div.player-container,
+body.pp-cinema-active div.video-container {
   visibility: hidden !important;
+}
+
+/* Đảm bảo 100% modal player của extension luôn hiển thị rõ ràng */
+#pikpak-ultra-cinema-modal,
+#pikpak-ultra-cinema-modal * {
+  visibility: visible !important;
 }
 
 /* Top-Left Video Title & Episode Badge */

@@ -310,10 +310,17 @@
     }
 
     ensureModalDom() {
-      if (document.getElementById("pikpak-ultra-cinema-modal")) {
-        this.modalContainer = document.getElementById("pikpak-ultra-cinema-modal");
-        this.modalVideo = document.getElementById("pikpak-ultra-modal-video");
-        return;
+      const existing = document.getElementById("pikpak-ultra-cinema-modal");
+      if (existing) {
+        const v = existing.querySelector("#pikpak-ultra-modal-video");
+        const ctrl = existing.querySelector("#pp-player-controls");
+        if (v && ctrl) {
+          this.modalContainer = existing;
+          this.modalVideo = v;
+          return;
+        }
+        console.log("[PikPak Ultra] 🔄 Tái tạo lại Cinema Modal DOM mới...");
+        existing.remove();
       }
 
       const modal = document.createElement("div");
@@ -337,8 +344,7 @@
           <video 
             id="pikpak-ultra-modal-video" 
             playsinline 
-            preload="auto" 
-            crossorigin="anonymous"
+            preload="auto"
           ></video>
 
           <!-- Bottom Video Thumbnail Carousel Drawer -->
@@ -708,10 +714,24 @@
         }
       });
 
-      // 15. Error recovery
+      // 15. Video lifecycle & error recovery
       v.addEventListener("error", () => {
-        console.warn("[PikPak Cinema] Video error encountered:", v.error);
-        if (this.refreshCallback) this.refreshCallback();
+        const err = v.error;
+        console.error(`[PikPak Cinema] ❌ Lỗi video: code=${err?.code}, message=${err?.message}`);
+        if (this.refreshCallback) {
+          console.log("[PikPak Cinema] 🔄 Yêu cầu làm mới stream link...");
+          this.refreshCallback();
+        }
+      });
+
+      v.addEventListener("loadedmetadata", () => {
+        console.log(`[PikPak Cinema] 📐 Đã tải metadata: ${v.videoWidth}x${v.videoHeight}, thời lượng=${Math.round(v.duration)}s`);
+        this.updateProgress();
+      });
+
+      v.addEventListener("playing", () => {
+        console.log("[PikPak Cinema] ▶️ Video đang phát");
+        this.updatePlayPauseUI();
       });
     }
 
@@ -851,6 +871,7 @@
       this.modalVideo.removeAttribute("src");
       this.modalVideo.src = streamUrl;
       this.modalVideo.currentTime = 0;
+      this.modalVideo.load();
 
       // 3. Show modal
       this.modalContainer.classList.add("active");
@@ -860,10 +881,22 @@
       const closeBtn = document.getElementById("pp-close-cinema-btn");
       if (closeBtn) closeBtn.style.display = "inline-flex";
 
-      this.modalVideo.play().catch(() => {
-        this.modalVideo.muted = true;
-        this.modalVideo.play().catch(() => {});
-      });
+      const playPromise = this.modalVideo.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log("[PikPak Cinema] ▶️ Video bắt đầu phát!");
+            this.updatePlayPauseUI();
+          })
+          .catch((err) => {
+            console.warn("[PikPak Cinema] Autoplay bị trình duyệt chặn tiếng, chuyển sang phát tắt tiếng:", err.message);
+            this.modalVideo.muted = true;
+            this.modalVideo.play().catch((e2) => {
+              console.error("[PikPak Cinema] Lỗi khi cố gắng phát video:", e2);
+            });
+            this.updateVolumeUI();
+          });
+      }
 
       this.resetIdleTimer();
       console.log("%c[PikPak Ultra] 🎬 Cinema Player Engine hoàn thiện! Giao diện chuẩn Apple TV+ / Netflix.", "color: #38bdf8; font-weight: bold;");
