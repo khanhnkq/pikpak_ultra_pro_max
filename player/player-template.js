@@ -28,6 +28,12 @@
           </button>
         </div>
 
+        <!-- 2X Speed Boost HUD Banner -->
+        <div class="pp-center-hud" id="pp-speed-boost-banner">
+        <span class="pp-center-hud-text" id="pp-speed-boost-text">2x</span>
+          <span class="pp-boost-arrows">${icons.forward || ""}</span>
+        </div>
+
         <!-- Center Feedback HUD -->
         <div class="pp-center-hud" id="pp-center-hud">
           <div id="pp-center-hud-icon"></div>
@@ -50,7 +56,12 @@
         <div class="pp-player-controls" id="pp-player-controls">
           <!-- Scrubber / Progress Bar -->
           <div class="pp-progress-area" id="pp-progress-area">
-            <div class="pp-scrub-tooltip" id="pp-scrub-tooltip">00:00</div>
+            <div class="pp-scrub-tooltip" id="pp-scrub-tooltip">
+              <div class="pp-scrub-preview-frame">
+                <video id="pp-scrub-preview-video" class="pp-scrub-preview-video" muted playsinline preload="auto"></video>
+              </div>
+              <div class="pp-scrub-preview-time" id="pp-scrub-preview-time">00:00</div>
+            </div>
             <div class="pp-progress-track">
               <div class="pp-progress-buffer" id="pp-progress-buffer"></div>
               <div class="pp-progress-played" id="pp-progress-played">
@@ -142,4 +153,10 @@
   root.PikPakPlayerTemplate = {
     renderPlayerModalHtml,
   };
-})(typeof globalThis !== "undefined" ? globalThis : typeof self !== "undefined" ? self : window);
+})(
+  typeof globalThis !== "undefined"
+    ? globalThis
+    : typeof self !== "undefined"
+      ? self
+      : window,
+);

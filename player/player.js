@@ -3,16 +3,11 @@
  */
 
 (function (root) {
-  function formatTime(seconds) {
-    if (isNaN(seconds) || seconds < 0) return "00:00";
-    const s = Math.floor(seconds);
-    const hrs = Math.floor(s / 3600);
-    const mins = Math.floor((s % 3600) / 60);
-    const secs = s % 60;
-    if (hrs > 0) {
-      return `${hrs.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-    }
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  function formatTime(s) {
+    s = Math.floor(isNaN(s) || s < 0 ? 0 : s);
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    const p = (n) => String(n).padStart(2, "0");
+    return h > 0 ? `${p(h)}:${p(m)}:${p(sec)}` : `${p(m)}:${p(sec)}`;
   }
 
   class VideoStreamController {
@@ -35,6 +30,7 @@
       // Sub-modules (DIP & SRP)
       this.shortcuts = new root.PlayerShortcutsManager(this);
       this.drawer = new root.PlayerDrawerManager(this);
+      this.preview = root.PlayerPreviewManager ? new root.PlayerPreviewManager(this) : null;
     }
 
     setNavigationHandlers(handlers) {
@@ -42,19 +38,11 @@
     }
 
     resetIdleTimer() {
-      const container = document.getElementById("pp-player-container");
-      if (!container) return;
-
-      container.classList.remove("pp-inactive");
-      clearTimeout(this.idleTimeout);
-
-      if (!this.modalVideo || this.modalVideo.paused) return; // Don't auto-hide when paused
-
+      const c = document.getElementById("pp-player-container"); if (!c) return;
+      c.classList.remove("pp-inactive"); clearTimeout(this.idleTimeout);
+      if (!this.modalVideo || this.modalVideo.paused) return;
       this.idleTimeout = setTimeout(() => {
-        if (!this.isDraggingProgress) {
-          container.classList.add("pp-inactive");
-          document.querySelectorAll(".pp-dropdown-menu").forEach((m) => m.classList.remove("show"));
-        }
+        if (!this.isDraggingProgress) { c.classList.add("pp-inactive"); document.querySelectorAll(".pp-dropdown-menu").forEach((m) => m.classList.remove("show")); }
       }, 2600);
     }
 
@@ -73,7 +61,8 @@
       document.querySelectorAll("#pp-speed-menu .pp-dropdown-item").forEach((item) => {
         item.classList.toggle("active", parseFloat(item.dataset.speed) === speed);
       });
-      this.shortcuts.showHud(`⚡ ${speed}x`, null);
+      const icons = root.PikPakIcons || {};
+      this.shortcuts.showHud(`${speed}x`, icons.speed);
     }
 
     togglePlay() {
@@ -104,16 +93,10 @@
     }
 
     toggleFullscreen() {
-      const container = document.getElementById("pp-player-container"), fsBtn = document.getElementById("pp-ctrl-fullscreen");
-      const icons = root.PikPakIcons || {};
-      if (!container) return;
-      if (!document.fullscreenElement) {
-        container.requestFullscreen().catch(() => {});
-        if (fsBtn) fsBtn.innerHTML = icons.exitFullscreen;
-      } else {
-        document.exitFullscreen().catch(() => {});
-        if (fsBtn) fsBtn.innerHTML = icons.fullscreen;
-      }
+      const c = document.getElementById("pp-player-container"), fsBtn = document.getElementById("pp-ctrl-fullscreen");
+      const icons = root.PikPakIcons || {}; if (!c) return;
+      if (!document.fullscreenElement) { c.requestFullscreen().catch(() => {}); if (fsBtn) fsBtn.innerHTML = icons.exitFullscreen; }
+      else { document.exitFullscreen().catch(() => {}); if (fsBtn) fsBtn.innerHTML = icons.fullscreen; }
     }
 
     ensureModalDom() {
@@ -152,10 +135,13 @@
       if (!v || this.isDraggingProgress) return;
       const cur = v.currentTime || 0, dur = v.duration || 0;
       const pct = dur > 0 ? (cur / dur) * 100 : 0;
-      const playedBar = document.getElementById("pp-progress-played");
+      // Don't overwrite played bar while user is hovering (preview mode)
+      if (!this.isHoveringProgress) {
+        const playedBar = document.getElementById("pp-progress-played");
+        if (playedBar) playedBar.style.width = `${pct}%`;
+      }
       const curTimeEl = document.getElementById("pp-time-current");
       const totalTimeEl = document.getElementById("pp-time-total");
-      if (playedBar) playedBar.style.width = `${pct}%`;
       if (curTimeEl) curTimeEl.textContent = formatTime(cur);
       if (totalTimeEl && dur > 0) totalTimeEl.textContent = formatTime(dur);
 
@@ -174,7 +160,6 @@
       const v = this.modalVideo;
       const container = document.getElementById("pp-player-container");
       const progressArea = document.getElementById("pp-progress-area");
-      const tooltip = document.getElementById("pp-scrub-tooltip");
 
       // Video event listeners
       v.addEventListener("timeupdate", () => this.updateProgress());
@@ -208,24 +193,40 @@
         }
       });
 
-      // Progress bar scrubbing
+      // Progress bar: hover preview (only shows tooltip, does NOT move played bar)
+      const handleHoverMove = (e) => {
+        const rect = progressArea.getBoundingClientRect();
+        const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        if (v.duration) this.preview?.updateHover(e, pos, v.duration);
+      };
+
+      // Progress bar: scrubbing (moves played bar + seeks video)
       const handleScrubMove = (e) => {
         const rect = progressArea.getBoundingClientRect();
         const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
         const playedBar = document.getElementById("pp-progress-played");
         if (playedBar) playedBar.style.width = `${pos * 100}%`;
-        if (tooltip && v.duration) {
-          tooltip.style.left = `${pos * 100}%`;
-          tooltip.textContent = formatTime(pos * v.duration);
-        }
+        if (v.duration) this.preview?.updateHover(e, pos, v.duration);
         return pos;
       };
 
-      progressArea.addEventListener("mouseenter", () => (tooltip.style.opacity = "1"));
-      progressArea.addEventListener("mouseleave", () => {
-        if (!this.isDraggingProgress) tooltip.style.opacity = "0";
+      progressArea.addEventListener("mouseenter", () => {
+        this.isHoveringProgress = true;
+        this.preview?.show();
       });
-      progressArea.addEventListener("mousemove", (e) => handleScrubMove(e));
+      progressArea.addEventListener("mouseleave", () => {
+        this.isHoveringProgress = false;
+        if (!this.isDraggingProgress) {
+          this.preview?.hide();
+          // Restore played bar to real playback position immediately
+          const dur = v.duration || 0;
+          if (dur > 0) {
+            const playedBar = document.getElementById("pp-progress-played");
+            if (playedBar) playedBar.style.width = `${(v.currentTime / dur) * 100}%`;
+          }
+        }
+      });
+      progressArea.addEventListener("mousemove", (e) => handleHoverMove(e));
 
       progressArea.addEventListener("mousedown", (e) => {
         this.isDraggingProgress = true;
@@ -243,8 +244,9 @@
 
         const onMouseUp = () => {
           this.isDraggingProgress = false;
+          this.isHoveringProgress = false;
           progressArea.classList.remove("dragging");
-          tooltip.style.opacity = "0";
+          this.preview?.hide();
           window.removeEventListener("mousemove", onMouseMove);
           window.removeEventListener("mouseup", onMouseUp);
           if (this.wasPlayingBeforeDrag) v.play().catch(() => {});
@@ -298,9 +300,18 @@
         console.log("[PikPak Cinema] 🏁 Video kết thúc! Tự động chuyển tập...");
         if (this.navigationHandlers?.onNext) this.navigationHandlers.onNext();
       });
+      let retryCount = 0;
+      let lastErrorTime = 0;
       v.addEventListener("error", () => {
+        const now = Date.now();
         console.error(`[PikPak Cinema] ❌ Lỗi video: code=${v.error?.code}`);
-        if (this.refreshCallback) this.refreshCallback();
+        if (now - lastErrorTime < 4000) return;
+        lastErrorTime = now;
+        if (retryCount < 2 && this.refreshCallback) {
+          retryCount++;
+          console.warn(`[PikPak Cinema] Đang thử kết nối lại link stream (${retryCount}/2)...`);
+          this.refreshCallback();
+        }
       });
       v.addEventListener("loadedmetadata", () => this.updateProgress());
       v.addEventListener("playing", () => this.updatePlayPauseUI());
@@ -394,7 +405,7 @@
           item.addEventListener("click", (e) => {
             e.stopPropagation();
             if (item.dataset.url) {
-              this.changeSource(item.dataset.url);
+              this.changeSource(item.dataset.url, true);
               qualityMenu.classList.remove("show");
               if (qualityLabel) qualityLabel.textContent = item.textContent.split(" ")[0];
             }
@@ -430,6 +441,7 @@
       this.modalVideo.src = streamUrl;
       this.modalVideo.currentTime = 0;
       this.modalVideo.load();
+      this.preview?.setSource(streamUrl);
 
       this.modalContainer.classList.add("active");
       this.isModalOpen = true;
@@ -458,33 +470,25 @@
       this.modalContainer.classList.remove("active");
       this.isModalOpen = false;
       (document.body || document.documentElement).classList.remove("pp-cinema-active");
-
-      const spinner = document.getElementById("pp-cinema-spinner");
-      if (spinner) spinner.classList.remove("show");
-
+      document.getElementById("pp-cinema-spinner")?.classList.remove("show");
       if (this.modalVideo) this.modalVideo.pause();
-
       this.drawer.toggle(false);
-
       document.querySelectorAll("video:not(#pikpak-ultra-modal-video)").forEach((v) => {
-        try {
-          v.style.display = "";
-          v.muted = false;
-        } catch (_) {}
+        try { v.style.display = ""; v.muted = false; } catch (_) {}
       });
-
       console.log("[PikPak Ultra] Cinema Modal Player đã đóng.");
     }
 
-    changeSource(newUrl) {
+    changeSource(newUrl, isUser = false) {
       if (!this.modalVideo) return;
       const curTime = this.modalVideo.currentTime || 0;
       this.currentStreamUrl = newUrl;
       this.modalVideo.src = newUrl;
       this.modalVideo.currentTime = curTime;
       this.modalVideo.load();
+      this.preview?.setSource(newUrl);
       this.modalVideo.play().catch(() => {});
-      this.shortcuts.showHud("Đổi độ phân giải", null);
+      if (isUser) this.shortcuts.showHud("Đổi độ phân giải", null);
     }
   }
 

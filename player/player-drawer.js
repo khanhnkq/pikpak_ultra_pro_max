@@ -76,6 +76,7 @@
               ${thumb ? `<img src="${thumb}" class="pp-thumb-img" loading="lazy" />` : `<div class="pp-thumb-fallback">${icons.play || "▶"}</div>`}
               <div class="pp-thumb-overlay">
                 ${isCur ? `<span class="pp-thumb-badge">Đang phát</span>` : ""}
+                ${v.durationText ? `<span class="pp-thumb-duration">${v.durationText}</span>` : ""}
                 <span class="pp-thumb-idx">#${i + 1}</span>
                 <span class="pp-thumb-name" title="${v.name}">${v.name}</span>
               </div>

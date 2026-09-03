@@ -1,0 +1,206 @@
+/**
+ * PikPak Ultra Pro Max - Seekbar Preview & Speed Boost Styles
+ */
+
+/* Hover Preview Tooltip Container */
+.pp-scrub-tooltip {
+  position: absolute;
+  bottom: 28px;
+  left: 0;
+  transform: translateX(-50%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.05s ease;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  user-select: none;
+}
+
+.pp-progress-area:hover .pp-scrub-tooltip,
+.pp-progress-area.dragging .pp-scrub-tooltip {
+  opacity: 1;
+}
+
+/* 16:9 Preview Frame */
+.pp-scrub-preview-frame {
+  width: 154px;
+  height: 86px;
+  background: #000000;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.85), 0 0 1px rgba(255, 255, 255, 0.2);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pp-scrub-preview-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  background: #0b0f19;
+}
+
+/* Timestamp badge below preview frame */
+.pp-scrub-preview-time {
+  margin-top: 5px;
+  padding: 2px 8px;
+  background: rgba(10, 14, 23, 0.92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 5px;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+}
+
+/* 2X Speed Boost HUD Banner — vertically centered with top buttons */
+.pp-speed-boost-banner {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px) scale(0.92);
+  opacity: 0;
+  pointer-events: none;
+  background: var(--pp-accent-subtle) !important;
+  backdrop-filter: blur(16px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
+  border: 1px solid var(--pp-accent-border) !important;
+  box-shadow: 0 4px 20px var(--pp-accent-glow) !important;
+  border-radius: 9999px;
+  padding: 0 18px;
+  height: 36px;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--pp-accent);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  line-height: 1;
+  text-transform: uppercase;
+  z-index: 60;
+  white-space: nowrap;
+  box-sizing: border-box;
+  transition: opacity 0.18s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pp-speed-boost-banner.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0) scale(1);
+}
+
+.pp-boost-icon,
+.pp-boost-label,
+.pp-boost-arrows {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.pp-boost-icon svg,
+.pp-boost-arrows svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.pp-boost-icon {
+  animation: ppBoostPulse 1s infinite alternate;
+}
+
+.pp-boost-arrows {
+  color: var(--pp-accent);
+  animation: ppBoostShift 0.8s infinite ease-in-out;
+}
+
+@keyframes ppBoostPulse {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(1.2); opacity: 1; }
+}
+
+@keyframes ppBoostShift {
+  0% { transform: translateX(0); }
+  50% { transform: translateX(2px); }
+  100% { transform: translateX(0); }
+}
+
+/* Top Ultra-Translucent Global Toast */
+#pikpak-ultra-toast {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-14px) scale(0.94);
+  background: rgba(10, 14, 26, 0.38) !important;
+  backdrop-filter: blur(16px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35) !important;
+  color: #ffffff;
+  padding: 6px 18px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  line-height: 1;
+  white-space: nowrap;
+  box-sizing: border-box;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  z-index: 9999999;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+}
+
+.pp-toast-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  flex-shrink: 0;
+  color: var(--pp-accent);
+}
+
+.pp-toast-icon svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.pp-toast-text {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+
+#pikpak-ultra-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0) scale(1);
+}
+
+#pikpak-ultra-toast.error {
+  border-color: rgba(239, 68, 68, 0.4) !important;
+  color: #fca5a5;
+  background: rgba(40, 10, 15, 0.45) !important;
+}
+
+#pikpak-ultra-toast.error .pp-toast-icon {
+  color: #f87171;
+}

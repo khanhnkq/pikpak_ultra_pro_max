@@ -20,12 +20,13 @@
   // Inject modular player and content scripts in dependency order into page execution context
   function injectScripts() {
     const scripts = [
+      "content/network-interceptor.js",
       "player/icons.js",
       "player/player-shortcuts.js",
       "player/player-drawer.js",
+      "player/player-preview.js",
       "player/player-template.js",
       "player/player.js",
-      "content/network-interceptor.js",
       "content/main.js",
     ];
 

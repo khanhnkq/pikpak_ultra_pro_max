@@ -54,15 +54,13 @@
 
   // ====== 2. Toast UI Helper ======
   function showToast(message, isError = false) {
-    let toast = document.getElementById("pikpak-ultra-toast");
-    if (!toast) {
-      toast = document.createElement("div");
-      toast.id = "pikpak-ultra-toast";
-      (document.body || document.documentElement).appendChild(toast);
-    }
-    toast.className = isError ? "error show" : "show";
-    toast.textContent = message;
-    setTimeout(() => toast.classList.remove("show"), 4500);
+    let t = document.getElementById("pikpak-ultra-toast") || Object.assign(document.createElement("div"), { id: "pikpak-ultra-toast" });
+    if (!t.parentElement) (document.body || document.documentElement).appendChild(t);
+    const icons = window.PikPakIcons || {}, iconSvg = isError ? (icons.alert || "") : (icons.check || "");
+    t.className = isError ? "error show" : "show";
+    t.innerHTML = `<span class="pp-toast-icon">${iconSvg}</span><span class="pp-toast-text">${message}</span>`;
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove("show"), 3500);
   }
 
   // ====== 3. Share Context Extractor ======
@@ -93,34 +91,88 @@
     return { shareId, parentId, fileId: fileId || paramFileId };
   }
 
-  // ====== 4. Suppress Limit Modals & Harvest Thumbnails ======
+  // ====== 4. Suppress Limit Modals, Harvest Thumbnails & Badges ======
   function suppressModals() {
     if (!isUnlocked) return;
-    const selectors = ['[class*="preview"]', '[class*="limit"]', '[class*="countdown"]', '[class*="save-dialog"]', '[class*="vip-modal"]', '[class*="modal-mask"]'];
-    document.querySelectorAll(selectors.join(",")).forEach((el) => {
-      const text = el.innerText || "";
-      if (text.includes("Previewing remaining") || text.includes("Preview remaining") || text.includes("00:30") || text.includes("Save Now") || text.includes("Save to Drive")) {
-        el.style.display = "none";
-        el.style.pointerEvents = "none";
+    const sel = '[class*="preview"],[class*="limit"],[class*="countdown"],[class*="save-dialog"],[class*="vip-modal"],[class*="modal-mask"]';
+    document.querySelectorAll(sel).forEach((el) => {
+      if (/Previewing remaining|Preview remaining|00:30|Save Now|Save to Drive/.test(el.innerText || "")) {
+        el.style.display = "none"; el.style.pointerEvents = "none";
+      }
+    });
+  }
+
+  function formatDuration(sec) {
+    const s = parseInt(sec, 10);
+    if (isNaN(s) || s <= 0) return "";
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const remSec = s % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(remSec).padStart(2, "0")}`;
+    return `${String(m).padStart(2, "0")}:${String(remSec).padStart(2, "0")}`;
+  }
+
+  function renderDurationBadgesOnWeb() {
+    const items = document.querySelectorAll('.file-item, .grid.file-item, .file-list-item, .el-table__row');
+    if (items.length === 0) return;
+
+    if (currentPlaylist.length === 0) {
+      const net = window.PikPakNetwork ? window.PikPakNetwork.getIntercepted() : {};
+      if (net?.playlist?.length > 0) currentPlaylist = net.playlist;
+    }
+
+    items.forEach((itemEl) => {
+      const thumb = itemEl.querySelector('.thumbnail') || itemEl.querySelector('.file-cover, .thumbnail-wrap, .player-file-cover');
+      if (!thumb || thumb.querySelector('.pp-web-duration-badge')) return;
+
+      let durationStr = "";
+
+      // 1. Đọc trực tiếp từ Vue 3 instance của PikPak trên DOM
+      try {
+        const comp = itemEl.__vueParentComponent || itemEl.__vnode?.ctx;
+        const vItem = comp?.props?.item || comp?.setupState?.item || comp?.data?.item || itemEl.__vue__?.item;
+        if (vItem) {
+          const s = parseInt(vItem.params?.duration || vItem.medias?.[0]?.video?.duration || 0, 10);
+          if (s > 0) durationStr = formatDuration(s);
+        }
+      } catch (_) {}
+
+      // 2. Khớp theo tên trong currentPlaylist
+      if (!durationStr && currentPlaylist?.length > 0) {
+        const nameEl = itemEl.querySelector('.name .ellipsis, .name, [class*="file-name"], [class*="title"]');
+        const alt = itemEl.querySelector('img')?.alt || '';
+        const rawName = (nameEl?.textContent || alt || itemEl.innerText || '').trim().split('\n')[0].trim().toLowerCase();
+        const matched = currentPlaylist.find((v) => {
+          if (!v?.name) return false;
+          const vn = v.name.toLowerCase();
+          return rawName.includes(vn) || vn.includes(rawName);
+        });
+        if (matched?.durationText) durationStr = matched.durationText;
+        else if (matched?.duration > 0) durationStr = formatDuration(matched.duration);
+      }
+
+      if (durationStr) {
+        const badge = document.createElement('span');
+        badge.className = 'pp-web-duration-badge';
+        badge.textContent = durationStr;
+        thumb.appendChild(badge);
       }
     });
   }
 
   function harvestPikPakThumbnails() {
-    const covers = document.querySelectorAll("#manager-preview-bar .player-file-cover, .file-list-box .file-list-item");
-    if (covers.length > 0 && currentPlaylist.length > 0) {
-      covers.forEach((el, idx) => {
-        const img = el.querySelector("img");
-        if (img?.src && currentPlaylist[idx] && (!currentPlaylist[idx].thumbnailLink || currentPlaylist[idx].thumbnailLink.length < 5)) {
-          currentPlaylist[idx].thumbnailLink = img.src;
-        }
-      });
-    }
+    document.querySelectorAll("#manager-preview-bar .player-file-cover, .file-list-box .file-list-item").forEach((el, idx) => {
+      const img = el.querySelector("img");
+      if (img?.src && currentPlaylist[idx] && (!currentPlaylist[idx].thumbnailLink || currentPlaylist[idx].thumbnailLink.length < 5)) {
+        currentPlaylist[idx].thumbnailLink = img.src;
+      }
+    });
   }
 
   const modalObserver = new MutationObserver(() => {
     suppressModals();
     harvestPikPakThumbnails();
+    renderDurationBadgesOnWeb();
     if (window.PikPakPlayer?.isModalOpen) {
       document.querySelectorAll("video:not(#pikpak-ultra-modal-video)").forEach((v) => {
         try { if (!v.paused) v.pause(); v.muted = true; v.volume = 0; } catch (_) {}
@@ -132,24 +184,18 @@
 
   // ====== 5. Playlist & Navigation State ======
   async function playVideoByIndex(index) {
-    if (!currentPlaylist || currentPlaylist.length === 0) return;
-    if (index < 0 || index >= currentPlaylist.length) return;
-
+    if (!currentPlaylist || index < 0 || index >= currentPlaylist.length) return;
     currentVideoIndex = index;
-    const targetVideo = currentPlaylist[currentVideoIndex];
-    console.log(`%c[PikPak Ultra] ⏭️ Chuyển sang video [${currentVideoIndex + 1}/${currentPlaylist.length}]: ${targetVideo.name}`, LOG_STYLE);
-    showToast(`Đang tải: ${targetVideo.name}`);
-
+    const target = currentPlaylist[currentVideoIndex];
+    console.log(`%c[PikPak Ultra] ⏭️ Chuyển video [${currentVideoIndex + 1}/${currentPlaylist.length}]: ${target.name}`, LOG_STYLE);
+    showToast(`Đang tải: ${target.name}`);
     const { shareId } = getShareContext();
-    if (shareId) {
-      await loadAndPlayFile(shareId, targetVideo.id);
-    }
+    if (shareId) await loadAndPlayFile(shareId, target.id);
   }
 
   function playNextVideo() {
-    if (currentPlaylist.length > 0 && currentVideoIndex < currentPlaylist.length - 1) {
-      playVideoByIndex(currentVideoIndex + 1);
-    } else showToast("Đã là video cuối cùng!");
+    if (currentPlaylist.length > 0 && currentVideoIndex < currentPlaylist.length - 1) playVideoByIndex(currentVideoIndex + 1);
+    else showToast("Đã là video cuối cùng!");
   }
 
   function playPrevVideo() {
@@ -157,37 +203,11 @@
     else showToast("Đã là video đầu tiên!");
   }
 
-  function updateControls() {}
+  function updateControls() {
+    renderDurationBadgesOnWeb();
+  }
 
   // ====== 7. Stream Resolution & Action Handlers ======
-  async function handleBypassClick() {
-    const { shareId, parentId, fileId } = getShareContext();
-    if (!shareId) return showToast("Không tìm thấy share ID!", true);
-    try {
-      showToast("Đang đọc danh sách video...");
-      const res = await sendToExtension("RESOLVE_SHARE", { shareId, parentId: parentId || "" });
-      const videos = res?.videos || [];
-      if (videos.length === 0) {
-        const net = window.PikPakNetwork ? window.PikPakNetwork.getIntercepted() : {};
-        const fallback = activeStreamData?.primaryUrl || net.streamUrl;
-        if (fallback) return applyDirectStream(fallback);
-        const targetId = fileId || parentId;
-        if (targetId) return await loadAndPlayFile(shareId, targetId);
-        throw new Error("Không tìm thấy video nào trong liên kết này!");
-      }
-
-      currentPlaylist = videos;
-      harvestPikPakThumbnails();
-      const targetId = fileId || res.targetFileId || parentId;
-      const matchedIdx = currentPlaylist.findIndex((v) => v.id === targetId);
-      currentVideoIndex = matchedIdx !== -1 ? matchedIdx : 0;
-      updateControls();
-      showToast(`Đang tải video: ${currentPlaylist[currentVideoIndex].name}`);
-      await loadAndPlayFile(shareId, currentPlaylist[currentVideoIndex].id);
-    } catch (err) {
-      showToast("Lỗi: " + err.message, true);
-    }
-  }
 
   async function loadAndPlayFile(shareId, fileId) {
     try {
@@ -221,13 +241,7 @@
   // ====== 8. Auto-Unlock Watcher ======
   async function checkAndAutoUnlock() {
     const currentVideo = document.querySelector("video:not(#pikpak-ultra-modal-video)");
-    if (!currentVideo) return;
-
-    if (currentVideo.dataset.ppUnlocked === "true" || currentVideo.dataset.ppUnlocked === "failed" || window.PikPakPlayer?.isModalOpen) {
-      return;
-    }
-
-    if (isAutoUnlocking) return;
+    if (!currentVideo || currentVideo.dataset.ppUnlocked === "true" || currentVideo.dataset.ppUnlocked === "failed" || window.PikPakPlayer?.isModalOpen || isAutoUnlocking) return;
     isAutoUnlocking = true;
 
     const attempts = parseInt(currentVideo.dataset.ppAttempts || "0", 10);
@@ -235,63 +249,37 @@
     if (attempts >= 3) {
       currentVideo.dataset.ppUnlocked = "failed";
       isAutoUnlocking = false;
-      console.warn("[PikPak Ultra] Đã thử tự mở khóa 3 lần thất bại. Tạm dừng.");
       return;
     }
 
-    console.log("%c[PikPak Ultra] 🤖 Phát hiện video! Mở Rạp Chiếu...", LOG_STYLE);
     try {
-      currentVideo.muted = true;
-      currentVideo.volume = 0;
-      currentVideo.pause();
-      currentVideo.style.display = "none";
+      currentVideo.muted = true; currentVideo.volume = 0; currentVideo.pause(); currentVideo.style.display = "none";
     } catch (_) {}
 
     try {
       const { shareId, parentId, fileId } = getShareContext();
-
-      if (shareId && currentPlaylist.length === 0) {
-        try {
-          const shareData = resolvedShareData || (await sendToExtension("RESOLVE_SHARE", { shareId, parentId }));
-          resolvedShareData = shareData;
-          if (shareData?.videos && shareData.videos.length > 0) {
-            currentPlaylist = shareData.videos;
-            const targetId = fileId || shareData.targetFileId || parentId;
-            const matchedIdx = currentPlaylist.findIndex((v) => v.id === targetId);
-            currentVideoIndex = matchedIdx !== -1 ? matchedIdx : 0;
-          }
-        } catch (e) {
-          console.warn("[PikPak Ultra] RESOLVE_SHARE:", e.message);
-        }
-      }
-
       const net = window.PikPakNetwork ? window.PikPakNetwork.getIntercepted() : {};
+
       if (net.streamUrl) {
-        console.log("%c[PikPak Ultra] ⚡ Mở Rạp Chiếu bằng stream URL bắt được:", LOG_SUCCESS, net.streamUrl);
         currentVideo.dataset.ppUnlocked = "true";
         if (currentPlaylist.length > 0 && currentVideoIndex === -1) currentVideoIndex = 0;
         updateControls();
-        applyDirectStream(net.streamUrl, {
-          playlist: currentPlaylist,
-          currentIndex: currentVideoIndex >= 0 ? currentVideoIndex : 0,
-        });
+        applyDirectStream(net.streamUrl, { playlist: currentPlaylist, currentIndex: Math.max(0, currentVideoIndex) });
         isAutoUnlocking = false;
         return;
       }
 
       if (shareId && currentPlaylist.length > 0) {
-        const playIdx = currentVideoIndex >= 0 ? currentVideoIndex : 0;
-        const targetVideo = currentPlaylist[playIdx];
+        const playIdx = Math.max(0, currentVideoIndex);
         currentVideo.dataset.ppUnlocked = "true";
         updateControls();
-        await loadAndPlayFile(shareId, targetVideo.id);
+        await loadAndPlayFile(shareId, currentPlaylist[playIdx].id);
       } else if (shareId && (fileId || parentId)) {
-        const targetId = fileId || parentId;
         currentVideo.dataset.ppUnlocked = "true";
-        await loadAndPlayFile(shareId, targetId);
+        await loadAndPlayFile(shareId, fileId || parentId);
       }
     } catch (err) {
-      console.warn("%c[PikPak Ultra] Auto-unlock error:", LOG_STYLE, err.message);
+      console.warn("[PikPak Ultra] Auto-unlock error:", err.message);
     } finally {
       isAutoUnlocking = false;
     }
@@ -303,10 +291,7 @@
 
     // Dập tắt triệt để video gốc ở nền
     document.querySelectorAll("video:not(#pikpak-ultra-modal-video)").forEach((v) => {
-      try {
-        v.pause(); v.muted = true; v.volume = 0; v.style.display = "none";
-        v.onplay = () => { if (window.PikPakPlayer?.isModalOpen) { v.pause(); v.muted = true; v.volume = 0; } };
-      } catch (_) {}
+      try { v.pause(); v.muted = true; v.volume = 0; v.style.display = "none"; v.onplay = () => { if (window.PikPakPlayer?.isModalOpen) { v.pause(); v.muted = true; v.volume = 0; } }; } catch (_) {}
     });
 
     window.PikPakPlayer?.openCinemaModal(url, {
@@ -334,8 +319,7 @@
     const net = window.PikPakNetwork ? window.PikPakNetwork.getIntercepted() : {};
     const url = activeStreamData?.primaryUrl || net.streamUrl;
     if (url) {
-      const a = document.createElement("a");
-      a.href = url; a.download = activeStreamData?.fileName || "video.mp4"; a.target = "_blank";
+      const a = Object.assign(document.createElement("a"), { href: url, download: activeStreamData?.fileName || "video.mp4", target: "_blank" });
       (document.body || document.documentElement).appendChild(a);
       a.click(); a.remove();
       showToast("Bắt đầu tải video...");
@@ -344,27 +328,16 @@
 
   // ====== 10. Instant Video Click Interceptor ======
   function handleFileItemClick(e) {
-    const itemEl = e.target.closest(
-      '.file-list-item, [class*="file-item"], [class*="file_item"], [class*="player-file-cover"], .el-table__row, [class*="grid-item"], [class*="card-item"]'
-    );
-    if (!itemEl) return;
-
-    if (e.target.closest('input, .el-checkbox, [class*="checkbox"], [class*="more-btn"], [class*="action-btn"], [class*="download"]')) {
-      return;
-    }
+    const itemEl = e.target.closest('.file-list-item, [class*="file-item"], [class*="file_item"], .el-table__row, [class*="grid-item"], [class*="card-item"]');
+    if (!itemEl || e.target.closest('input, .el-checkbox, [class*="checkbox"], [class*="more-btn"], [class*="action-btn"], [class*="download"]')) return;
 
     // 1. Phân biệt thư mục: Tuyệt đối không can thiệp khi bấm vào thư mục
-    const isFolder = Boolean(
-      itemEl.querySelector('img[src*="folder"], svg[class*="folder"], [class*="folder-icon"], [class*="icon-folder"]') ||
-      itemEl.classList.contains("is-folder") ||
-      itemEl.getAttribute("data-kind") === "drive#folder" ||
-      itemEl.querySelector('[class*="folder"]')
-    );
-    if (isFolder) return;
+    if (itemEl.querySelector('img[src*="folder"], svg[class*="folder"], [class*="folder-icon"], [class*="folder"]') || itemEl.classList.contains("is-folder") || itemEl.getAttribute("data-kind") === "drive#folder") return;
 
     // 2. Kiểm tra phần tử có chắc chắn là video hay không
     const itemText = (itemEl.innerText || "").trim();
     const isVideoExt = /\.(mp4|mkv|avi|mov|wmv|flv|webm|ts|m4v|3gp|rmvb|iso)/i.test(itemText);
+    const hasPlayIcon = Boolean(itemEl.querySelector(".play-icon, [class*='play-icon']"));
 
     let matchedVideo = null, matchedIdx = -1;
     if (currentPlaylist?.length > 0) {
@@ -372,7 +345,7 @@
       if (matchedIdx !== -1) matchedVideo = currentPlaylist[matchedIdx];
     }
 
-    if (!matchedVideo && !isVideoExt) return;
+    if (!matchedVideo && !isVideoExt && !hasPlayIcon) return;
 
     // Đã xác nhận là video: Chặn đứng PikPak mở trình phát gốc
     e.preventDefault();
@@ -394,9 +367,17 @@
       });
     }
 
-    if (matchedVideo?.id) {
+    let vueFileId = null;
+    try {
+      const comp = itemEl.__vueParentComponent || itemEl.__vnode?.ctx;
+      const vItem = comp?.props?.item || comp?.setupState?.item || comp?.data?.item || itemEl.__vue__?.item;
+      if (vItem?.id) vueFileId = vItem.id;
+    } catch (_) {}
+
+    const targetFileId = matchedVideo?.id || vueFileId;
+    if (targetFileId) {
       currentVideoIndex = playIdx;
-      loadAndPlayFile(shareId, matchedVideo.id);
+      loadAndPlayFile(shareId, targetFileId);
     } else {
       const netPlaylist = window.PikPakNetwork?.getIntercepted()?.playlist;
       if (netPlaylist?.length > 0) {
@@ -405,42 +386,61 @@
         currentVideoIndex = currentPlaylist.indexOf(target);
         loadAndPlayFile(shareId, target.id);
       } else {
-        sendToExtension("RESOLVE_SHARE", { shareId }).then((res) => {
-          if (res?.videos?.length > 0) {
-            currentPlaylist = res.videos;
-            harvestPikPakThumbnails();
-            const target = currentPlaylist.find((v) => itemText.includes(v.name)) || currentPlaylist[0];
-            const idx = currentPlaylist.indexOf(target);
-            currentVideoIndex = idx !== -1 ? idx : 0;
-            loadAndPlayFile(shareId, target.id);
-          }
-        }).catch((err) => showToast("Lỗi mở video: " + err.message, true));
+        const net = window.PikPakNetwork ? window.PikPakNetwork.getIntercepted() : {};
+        if (net.streamUrl) applyDirectStream(net.streamUrl);
+        else {
+          sendToExtension("RESOLVE_SHARE", { shareId }).then((res) => {
+            if (res?.videos?.length > 0) {
+              currentPlaylist = res.videos;
+              harvestPikPakThumbnails();
+              const target = currentPlaylist.find((v) => itemText.includes(v.name)) || currentPlaylist[0];
+              loadAndPlayFile(shareId, target.id);
+            } else {
+              const netLater = window.PikPakNetwork ? window.PikPakNetwork.getIntercepted() : {};
+              if (netLater.streamUrl) applyDirectStream(netLater.streamUrl);
+            }
+          }).catch((err) => showToast("Lỗi mở video: " + err.message, true));
+        }
       }
     }
   }
 
   document.addEventListener("click", handleFileItemClick, true);
 
+  let lastPrefetchedKey = "";
+  let isPrefetching = false;
+
   async function prefetchPlaylist() {
+    if (isPrefetching) return;
+    const { shareId, parentId } = getShareContext();
+    if (!shareId) return;
+
     const netPlaylist = window.PikPakNetwork?.getIntercepted()?.playlist;
-    if (netPlaylist?.length > 0 && currentPlaylist.length === 0) {
-      currentPlaylist = netPlaylist;
-      harvestPikPakThumbnails();
-      updateControls();
+    if (netPlaylist?.length > 0) {
+      if (currentPlaylist.length === 0) {
+        currentPlaylist = netPlaylist;
+        harvestPikPakThumbnails();
+        updateControls();
+      }
       return;
     }
 
-    const { shareId, parentId } = getShareContext();
-    if (shareId && currentPlaylist.length === 0) {
-      try {
-        const res = await sendToExtension("RESOLVE_SHARE", { shareId, parentId });
-        if (res?.videos?.length > 0) {
-          currentPlaylist = res.videos;
-          resolvedShareData = res;
-          harvestPikPakThumbnails();
-          updateControls();
-        }
-      } catch (_) {}
+    const key = `${shareId}_${parentId || "root"}`;
+    if (key === lastPrefetchedKey) return;
+    lastPrefetchedKey = key;
+    isPrefetching = true;
+
+    try {
+      const res = await sendToExtension("RESOLVE_SHARE", { shareId, parentId });
+      if (res?.videos?.length > 0) {
+        currentPlaylist = res.videos;
+        resolvedShareData = res;
+        harvestPikPakThumbnails();
+        updateControls();
+      }
+    } catch (_) {
+    } finally {
+      isPrefetching = false;
     }
   }
 
@@ -448,7 +448,6 @@
   setInterval(() => {
     if (isContextInvalidated) return;
     checkAndAutoUnlock();
-    prefetchPlaylist();
 
     const { shareId, parentId, fileId } = getShareContext();
     const targetId = fileId || parentId;
@@ -470,11 +469,19 @@
       resolvedShareData = null;
       isUnlocked = false;
       sendToExtension("TAB_READY", { shareId, parentId }).catch(() => {});
+      prefetchPlaylist();
     }
   }, 1000);
 
   if (window.PikPakNetwork) {
-    window.PikPakNetwork.onStreamUrl(() => checkAndAutoUnlock());
+    window.PikPakNetwork.onStreamUrl((url) => {
+      if (url && !isUnlocked) {
+        applyDirectStream(url, {
+          playlist: currentPlaylist,
+          currentIndex: currentVideoIndex >= 0 ? currentVideoIndex : 0,
+        });
+      } else checkAndAutoUnlock();
+    });
     window.PikPakNetwork.onPlaylist((videos) => {
       if (videos?.length > 0) {
         currentPlaylist = videos;

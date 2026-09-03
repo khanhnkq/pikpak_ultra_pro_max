@@ -35,16 +35,7 @@
   pointer-events: none !important;
 }
 
-.pp-cinema-active [class*="video-player"]:not(#pikpak-ultra-cinema-modal):not(#pikpak-ultra-cinema-modal *),
-.pp-cinema-active [class*="preview-player"]:not(#pikpak-ultra-cinema-modal):not(#pikpak-ultra-cinema-modal *),
-.pp-cinema-active [class*="dplayer"]:not(#pikpak-ultra-cinema-modal):not(#pikpak-ultra-cinema-modal *),
-.pp-cinema-active [class*="artplayer"]:not(#pikpak-ultra-cinema-modal):not(#pikpak-ultra-cinema-modal *),
-.pp-cinema-active #manager-preview-bar,
-.pp-cinema-active .preview-bar,
-.pp-cinema-active div.player-container,
-.pp-cinema-active div.video-container,
-.pp-cinema-active div[class*="play-modal"],
-.pp-cinema-active div[class*="preview-layer"] {
+.pp-cinema-active :is([class*="video-player"], [class*="preview-player"], [class*="dplayer"], [class*="artplayer"], #manager-preview-bar, .preview-bar, div.player-container, div.video-container, div[class*="play-modal"], div[class*="preview-layer"]):not(#pikpak-ultra-cinema-modal):not(#pikpak-ultra-cinema-modal *) {
   display: none !important;
   visibility: hidden !important;
   opacity: 0 !important;
@@ -121,45 +112,55 @@
   outline: none;
 }
 
-/* Center HUD Feedback */
+/* Top Ultra-Translucent HUD Feedback — vertically centered with top buttons (top:16px h:36px) */
 .pp-center-hud {
   position: absolute;
-  top: 50%;
+  top: 16px;
   left: 50%;
-  transform: translate(-50%, -50%) scale(0.85);
-  display: flex;
-  flex-direction: column;
+  transform: translateX(-50%) translateY(-8px) scale(0.92);
+  display: inline-flex;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-width: 90px;
-  padding: 16px 22px;
-  background: rgba(14, 16, 22, 0.86);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid var(--pp-glass-border);
-  border-radius: 20px;
-  color: var(--pp-text-primary);
-  font-size: 14px;
-  font-weight: 600;
+  min-width: unset;
+  padding: 0 18px;
+  height: 36px;
+  background: rgba(10, 14, 26, 0.35) !important;
+  backdrop-filter: blur(16px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 9999px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  line-height: 1;
+  white-space: nowrap;
   pointer-events: none;
   opacity: 0;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
-  z-index: 20;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  z-index: 60;
 }
 
 .pp-center-hud.show {
   opacity: 1;
-  transform: translate(-50%, -50%) scale(1);
+  transform: translateX(-50%) translateY(0) scale(1);
 }
 
-.pp-center-hud svg {
-  width: 30px;
-  height: 30px;
-  fill: var(--pp-icon-color);
-  stroke: var(--pp-icon-color);
+#pp-center-hud-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  flex-shrink: 0;
+  color: #38bdf8;
 }
+
+#pp-center-hud-icon:empty { display: none; }
+#pp-center-hud-icon svg { width: 15px; height: 15px; display: block; }
+#pp-center-hud-text { display: inline-flex; align-items: center; line-height: 1; }
 
 /* Sleek Apple TV+ Loading Spinner */
 .pp-cinema-spinner {
@@ -286,29 +287,6 @@
   transform: translateY(-50%) scale(1);
 }
 
-/* Hover Timestamp Tooltip */
-.pp-scrub-tooltip {
-  position: absolute;
-  bottom: 24px;
-  left: 0;
-  transform: translateX(-50%);
-  padding: 4px 8px;
-  background: rgba(14, 16, 22, 0.95);
-  border: 1px solid var(--pp-glass-border);
-  border-radius: 6px;
-  color: var(--pp-text-primary);
-  font-size: 11px;
-  font-weight: 600;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-  white-space: nowrap;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
-}
-
-.pp-progress-area:hover .pp-scrub-tooltip {
-  opacity: 1;
-}
 
 /* Control Buttons Row */
 .pp-controls-row {
@@ -477,3 +455,15 @@
 }
 .pp-dropdown-item:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
 .pp-dropdown-item.active { background: var(--pp-accent-subtle); color: var(--pp-accent); font-weight: 600; }
+
+/* Duration badge on PikPak web interface */
+.pp-web-duration-badge {
+  position: absolute !important; bottom: 6px !important; right: 6px !important;
+  background: rgba(0, 0, 0, 0.85) !important; backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important; color: #ffffff !important;
+  font-size: 11px !important; font-weight: 700 !important; padding: 2px 6px !important;
+  border-radius: 4px !important; line-height: 1.2 !important; pointer-events: none !important;
+  z-index: 20 !important; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5) !important;
+  letter-spacing: 0.3px !important; display: inline-block !important;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif !important;
+}

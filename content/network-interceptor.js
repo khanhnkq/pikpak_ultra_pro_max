@@ -22,6 +22,18 @@
     });
   }
 
+  function formatDuration(sec) {
+    const s = parseInt(sec, 10);
+    if (isNaN(s) || s <= 0) return "";
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const remSec = s % 60;
+    if (h > 0) {
+      return `${h}:${String(m).padStart(2, "0")}:${String(remSec).padStart(2, "0")}`;
+    }
+    return `${String(m).padStart(2, "0")}:${String(remSec).padStart(2, "0")}`;
+  }
+
   function notifyPlaylist(videos) {
     autoInterceptedPlaylist = videos;
     playlistCallbacks.forEach((cb) => {
@@ -41,10 +53,13 @@
           const ext = (item.name || "").substring((item.name || "").lastIndexOf(".")).toLowerCase();
           const isVid = /\.(mp4|mkv|avi|mov|wmv|flv|webm|ts|m4v|3gp|rmvb)/i.test(ext) || (item.mime_type || "").startsWith("video/");
           if (isVid) {
+            const durSec = parseInt(item.params?.duration || item.medias?.[0]?.video?.duration || 0, 10);
             videos.push({
               id: item.id,
               name: item.name,
               size: parseInt(item.size, 10) || 0,
+              duration: durSec,
+              durationText: formatDuration(durSec),
               mimeType: item.mime_type,
               isVideo: true,
               thumbnailLink: item.thumbnail_link || item.icon_link || "",
@@ -57,15 +72,17 @@
         notifyPlaylist(videos);
       }
     }
-    if (data.web_content_link) {
-      console.log("%c[PikPak Ultra] 🎯 Bắt được web_content_link:", LOG_SUCCESS, data.web_content_link);
-      notifyStreamUrl(data.web_content_link);
-    } else if (data.medias && data.medias.length > 0) {
+    let streamUrl = "";
+    if (data.medias && data.medias.length > 0) {
       const orig = data.medias.find((m) => m.media_name === "original") || data.medias[0];
-      if (orig?.link?.url) {
-        console.log("%c[PikPak Ultra] 🎯 Bắt được stream URL:", LOG_SUCCESS, orig.link.url);
-        notifyStreamUrl(orig.link.url);
-      }
+      if (orig?.link?.url) streamUrl = orig.link.url;
+    }
+    if (!streamUrl && data.web_content_link && !data.web_content_link.includes("fid=&")) {
+      streamUrl = data.web_content_link;
+    }
+    if (streamUrl) {
+      console.log("%c[PikPak Ultra] 🎯 Bắt được stream URL:", LOG_SUCCESS, streamUrl);
+      notifyStreamUrl(streamUrl);
     }
   }
 
