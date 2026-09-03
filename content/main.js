@@ -66,7 +66,7 @@
     if (!toast) {
       toast = document.createElement("div");
       toast.id = "pikpak-ultra-toast";
-      document.body.appendChild(toast);
+      (document.body || document.documentElement).appendChild(toast);
     }
     toast.className = isError ? "error" : "";
     toast.textContent = message;
@@ -81,50 +81,36 @@
     const net = window.PikPakNetwork ? window.PikPakNetwork.getIntercepted() : {};
     let shareId = net.shareId || null;
     let parentId = net.parentId || "";
+    const fileId = net.fileId || null;
 
-    // Path /s/<shareId>/<parentId>
-    const pathMatch = window.location.pathname.match(/\/s\/([a-zA-Z0-9_-]+)(?:\/([a-zA-Z0-9_-]+))?/);
-    if (pathMatch) {
-      if (!shareId) shareId = pathMatch[1];
-      if (!parentId && pathMatch[2]) parentId = pathMatch[2];
+    const fullHref = window.location.href;
+    const sIndex = fullHref.indexOf("/s/");
+    if (sIndex !== -1) {
+      const cleanPath = fullHref.substring(sIndex + 3).split(/[?#]/)[0];
+      const segments = cleanPath.split("/").filter(Boolean);
+      if (segments.length >= 1) {
+        if (!shareId) shareId = segments[0];
+        if (!parentId && segments.length > 1) {
+          parentId = segments[segments.length - 1];
+        }
+      }
     }
 
-    // Hash #/s/<shareId>/<parentId>
-    const hashMatch = window.location.hash.match(/s\/([a-zA-Z0-9_-]+)(?:\/([a-zA-Z0-9_-]+))?/);
-    if (hashMatch) {
-      if (!shareId) shareId = hashMatch[1];
-      if (!parentId && hashMatch[2]) parentId = hashMatch[2];
-    }
-
-    // Query params
     const searchParams = new URLSearchParams(window.location.search);
     if (!shareId && searchParams.get("share_id")) shareId = searchParams.get("share_id");
     if (!parentId && searchParams.get("parent_id")) parentId = searchParams.get("parent_id");
+    const paramFileId = searchParams.get("file_id");
 
-    return { shareId, parentId };
+    return { shareId, parentId, fileId: fileId || paramFileId };
   }
 
   // ====== 4. Suppress Limit Modals & Harvest Thumbnails ======
   function suppressModals() {
     if (!isUnlocked) return;
-    const selectors = [
-      '[class*="preview"]',
-      '[class*="limit"]',
-      '[class*="countdown"]',
-      '[class*="save-dialog"]',
-      '[class*="vip-modal"]',
-      '[class*="modal-mask"]',
-    ];
-
+    const selectors = ['[class*="preview"]', '[class*="limit"]', '[class*="countdown"]', '[class*="save-dialog"]', '[class*="vip-modal"]', '[class*="modal-mask"]'];
     document.querySelectorAll(selectors.join(",")).forEach((el) => {
       const text = el.innerText || "";
-      if (
-        text.includes("Previewing remaining") ||
-        text.includes("Preview remaining") ||
-        text.includes("00:30") ||
-        text.includes("Save Now") ||
-        text.includes("Save to Drive")
-      ) {
+      if (text.includes("Previewing remaining") || text.includes("Preview remaining") || text.includes("00:30") || text.includes("Save Now") || text.includes("Save to Drive")) {
         el.style.display = "none";
         el.style.pointerEvents = "none";
       }
@@ -136,10 +122,8 @@
     if (covers.length > 0 && currentPlaylist.length > 0) {
       covers.forEach((el, idx) => {
         const img = el.querySelector("img");
-        if (img && img.src && currentPlaylist[idx]) {
-          if (!currentPlaylist[idx].thumbnailLink || currentPlaylist[idx].thumbnailLink.length < 5) {
-            currentPlaylist[idx].thumbnailLink = img.src;
-          }
+        if (img?.src && currentPlaylist[idx] && (!currentPlaylist[idx].thumbnailLink || currentPlaylist[idx].thumbnailLink.length < 5)) {
+          currentPlaylist[idx].thumbnailLink = img.src;
         }
       });
     }
@@ -150,11 +134,7 @@
     harvestPikPakThumbnails();
     if (window.PikPakPlayer?.isModalOpen) {
       document.querySelectorAll("video:not(#pikpak-ultra-modal-video)").forEach((v) => {
-        try {
-          if (!v.paused) v.pause();
-          v.muted = true;
-          v.volume = 0;
-        } catch (_) {}
+        try { if (!v.paused) v.pause(); v.muted = true; v.volume = 0; } catch (_) {}
       });
     }
     checkAndAutoUnlock();
@@ -250,7 +230,7 @@
   // ====== 7. Stream Resolution & Action Handlers ======
   async function handleBypassClick() {
     console.log("%c[PikPak Ultra] 🖱️ Kích hoạt tải video", LOG_STYLE);
-    const { shareId, parentId } = getShareContext();
+    const { shareId, parentId, fileId } = getShareContext();
     if (!shareId) {
       showToast("Không tìm thấy share ID!", true);
       return;
@@ -266,21 +246,29 @@
       const videos = resolvedShareData.videos || [];
       if (videos.length === 0) {
         const net = window.PikPakNetwork ? window.PikPakNetwork.getIntercepted() : {};
-        if (net.streamUrl) {
-          applyDirectStream(net.streamUrl);
+        const fallbackUrl = activeStreamData?.primaryUrl || net.streamUrl;
+        if (fallbackUrl) {
+          applyDirectStream(fallbackUrl);
           return;
         }
-        throw new Error("Không tìm thấy video nào trong thư mục này!");
+        const targetId = fileId || parentId;
+        if (targetId) {
+          await loadAndPlayFile(shareId, targetId);
+          return;
+        }
+        throw new Error("Không tìm thấy video nào trong liên kết này!");
       }
 
       currentPlaylist = videos;
       harvestPikPakThumbnails();
-      currentVideoIndex = 0;
+      const targetId = fileId || resolvedShareData.targetFileId || parentId;
+      const matchedIdx = currentPlaylist.findIndex((v) => v.id === targetId);
+      currentVideoIndex = matchedIdx !== -1 ? matchedIdx : 0;
       updateControls();
 
-      const firstVideo = currentPlaylist[0];
-      showToast(`Đang tải video: ${firstVideo.name}`);
-      await loadAndPlayFile(shareId, firstVideo.id);
+      const selectedVideo = currentPlaylist[currentVideoIndex];
+      showToast(`Đang tải video: ${selectedVideo.name}`);
+      await loadAndPlayFile(shareId, selectedVideo.id);
     } catch (err) {
       console.error("%c[PikPak Ultra] Lỗi bypass:", LOG_ERR, err);
       showToast("Lỗi: " + err.message, true);
@@ -354,7 +342,7 @@
     } catch (_) {}
 
     try {
-      const { shareId, parentId } = getShareContext();
+      const { shareId, parentId, fileId } = getShareContext();
 
       if (shareId && currentPlaylist.length === 0) {
         try {
@@ -362,7 +350,8 @@
           resolvedShareData = shareData;
           if (shareData?.videos && shareData.videos.length > 0) {
             currentPlaylist = shareData.videos;
-            const matchedIdx = currentPlaylist.findIndex((v) => v.id === parentId || v.id === shareData.targetFileId);
+            const targetId = fileId || shareData.targetFileId || parentId;
+            const matchedIdx = currentPlaylist.findIndex((v) => v.id === targetId);
             currentVideoIndex = matchedIdx !== -1 ? matchedIdx : 0;
           }
         } catch (e) {
@@ -390,6 +379,10 @@
         currentVideo.dataset.ppUnlocked = "true";
         updateControls();
         await loadAndPlayFile(shareId, targetVideo.id);
+      } else if (shareId && (fileId || parentId)) {
+        const targetId = fileId || parentId;
+        currentVideo.dataset.ppUnlocked = "true";
+        await loadAndPlayFile(shareId, targetId);
       }
     } catch (err) {
       console.warn("%c[PikPak Ultra] Auto-unlock error:", LOG_STYLE, err.message);
@@ -456,7 +449,7 @@
       a.href = url;
       a.download = activeStreamData?.fileName || "video.mp4";
       a.target = "_blank";
-      document.body.appendChild(a);
+      (document.body || document.documentElement).appendChild(a);
       a.click();
       a.remove();
       showToast("Bắt đầu tải video...");
@@ -470,7 +463,18 @@
     setupToolbar();
     checkAndAutoUnlock();
 
-    const { shareId, parentId } = getShareContext();
+    const { shareId, parentId, fileId } = getShareContext();
+    const targetId = fileId || parentId;
+
+    if (currentPlaylist.length > 0 && targetId && currentPlaylist.some((v) => v.id === targetId)) {
+      const matchedIdx = currentPlaylist.findIndex((v) => v.id === targetId);
+      if (matchedIdx !== -1 && matchedIdx !== currentVideoIndex) {
+        currentParentId = parentId;
+        playVideoByIndex(matchedIdx);
+      }
+      return;
+    }
+
     if (shareId && (shareId !== currentShareId || parentId !== currentParentId)) {
       currentShareId = shareId;
       currentParentId = parentId;
@@ -478,7 +482,7 @@
       currentVideoIndex = -1;
       resolvedShareData = null;
       isUnlocked = false;
-      sendToExtension("TAB_READY", { shareId: shareId, parentId: parentId }).catch(() => {});
+      sendToExtension("TAB_READY", { shareId, parentId }).catch(() => {});
     }
   }, 1000);
 

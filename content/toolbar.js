@@ -69,7 +69,7 @@
         </button>
       `;
 
-      document.body.appendChild(toolbar);
+      (document.body || document.documentElement).appendChild(toolbar);
 
       // Event listeners
       document.getElementById("pp-prev-btn")?.addEventListener("click", () => this.callbacks.onPrev?.());

@@ -156,7 +156,7 @@
       const shortcutsHtml = this.shortcuts.renderShortcutsModalHtml();
 
       modal.innerHTML = templateBuilder.renderPlayerModalHtml(drawerHtml, shortcutsHtml);
-      document.body.appendChild(modal);
+      (document.body || document.documentElement).appendChild(modal);
 
       this.modalContainer = modal;
       this.modalVideo = modal.querySelector("#pikpak-ultra-modal-video");
@@ -415,7 +415,7 @@
       }
 
       // Tối ưu hiệu năng: Dập tắt triệt để video gốc ở nền
-      document.body.classList.add("pp-cinema-active");
+      (document.body || document.documentElement).classList.add("pp-cinema-active");
       document.querySelectorAll("video:not(#pikpak-ultra-modal-video)").forEach((v) => {
         try {
           v.pause();
@@ -461,7 +461,7 @@
       if (!this.modalContainer) return;
       this.modalContainer.classList.remove("active");
       this.isModalOpen = false;
-      document.body.classList.remove("pp-cinema-active");
+      (document.body || document.documentElement).classList.remove("pp-cinema-active");
 
       if (this.modalVideo) this.modalVideo.pause();
 

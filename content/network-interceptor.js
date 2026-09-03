@@ -9,6 +9,7 @@
 
   let autoInterceptedShareId = null;
   let autoInterceptedParentId = null;
+  let autoInterceptedFileId = null;
   let autoInterceptedUrl = null;
   const streamCallbacks = [];
 
@@ -29,19 +30,24 @@
     try {
       const url = args[0] instanceof Request ? args[0].url : String(args[0]);
 
-      // Detect active share_id and parent_id from PikPak's own API calls
+      // Detect active share_id, parent_id, and file_id from PikPak's own API calls
       if (url.includes("/drive/v1/share")) {
         try {
           const parsed = new URL(url, window.location.origin);
           const sId = parsed.searchParams.get("share_id");
           const pId = parsed.searchParams.get("parent_id");
+          const fId = parsed.searchParams.get("file_id");
           if (sId) {
             autoInterceptedShareId = sId;
-            console.log(`%c[PikPak Ultra] 🎯 Bắt được share_id từ API call: ${sId}`, LOG_STYLE);
+            console.log(`%c[PikPak Ultra] 🎯 Bắt được share_id: ${sId}`, LOG_STYLE);
           }
           if (pId !== null && pId !== undefined) {
             autoInterceptedParentId = pId;
-            console.log(`%c[PikPak Ultra] 🎯 Bắt được parent_id từ API call: ${pId || "(root)"}`, LOG_STYLE);
+            console.log(`%c[PikPak Ultra] 🎯 Bắt được parent_id: ${pId || "(root)"}`, LOG_STYLE);
+          }
+          if (fId) {
+            autoInterceptedFileId = fId;
+            console.log(`%c[PikPak Ultra] 🎯 Bắt được file_id: ${fId}`, LOG_STYLE);
           }
         } catch (_) {}
       }
@@ -52,8 +58,11 @@
         clone
           .json()
           .then((data) => {
+            if (data?.file_info?.id) {
+              autoInterceptedFileId = data.file_info.id;
+            }
             if (data?.web_content_link) {
-              console.log("%c[PikPak Ultra] 🎯 Bắt được web_content_link trực tiếp:", LOG_SUCCESS, data.web_content_link);
+              console.log("%c[PikPak Ultra] 🎯 Bắt được web_content_link:", LOG_SUCCESS, data.web_content_link);
               notifyStreamUrl(data.web_content_link);
             } else if (data?.medias && data.medias.length > 0) {
               const orig = data.medias.find((m) => m.media_name === "original") || data.medias[0];
@@ -83,6 +92,9 @@
       try {
         if (this._ppUrl && (this._ppUrl.includes("/drive/") || this._ppUrl.includes("mypikpak"))) {
           const data = JSON.parse(this.responseText);
+          if (data?.file_info?.id) {
+            autoInterceptedFileId = data.file_info.id;
+          }
           if (data?.web_content_link) {
             console.log("%c[PikPak Ultra] 🎯 XHR bắt được web_content_link:", LOG_SUCCESS, data.web_content_link);
             notifyStreamUrl(data.web_content_link);
@@ -97,6 +109,7 @@
     getIntercepted: () => ({
       shareId: autoInterceptedShareId,
       parentId: autoInterceptedParentId,
+      fileId: autoInterceptedFileId,
       streamUrl: autoInterceptedUrl,
     }),
     onStreamUrl: (cb) => streamCallbacks.push(cb),

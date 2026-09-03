@@ -84,6 +84,7 @@ async function handleResolveShare({ shareId, passCode = "", parentId = "" }) {
     subfolders: result.subfolders,
     totalFiles: result.allFiles.length,
     videoCount: result.videos.length,
+    targetFileId: result.targetFileId || null,
   };
 }
 
