@@ -1,7 +1,7 @@
 [
   {
     "id": 1,
-    "priority": 1,
+    "priority": 2,
     "action": {
       "type": "modifyHeaders",
       "responseHeaders": [
@@ -14,12 +14,30 @@
       ]
     },
     "condition": {
-      "regexFilter": "^https?://.*\\.mypikpak\\.(com|net)/(download|file|media)/.*",
-      "resourceTypes": ["media", "xmlhttprequest", "other", "sub_frame"]
+      "regexFilter": "^https?://.*\\.mypikpak\\.(com|net)/.*(download|file|media|stream|play).*",
+      "resourceTypes": ["media"]
     }
   },
   {
     "id": 2,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        { "header": "content-disposition", "operation": "remove" },
+        { "header": "access-control-allow-origin", "operation": "set", "value": "*" },
+        { "header": "access-control-allow-methods", "operation": "set", "value": "GET, HEAD, OPTIONS" },
+        { "header": "access-control-allow-headers", "operation": "set", "value": "*, Range, Content-Range, Accept-Ranges, Origin, Referer, User-Agent, X-Requested-With" },
+        { "header": "access-control-expose-headers", "operation": "set", "value": "Content-Range, Content-Length, Accept-Ranges, *" }
+      ]
+    },
+    "condition": {
+      "regexFilter": "^https?://.*\\.mypikpak\\.(com|net)/.*(download|file|media|stream|play).*",
+      "resourceTypes": ["xmlhttprequest", "other", "sub_frame"]
+    }
+  },
+  {
+    "id": 3,
     "priority": 1,
     "action": {
       "type": "modifyHeaders",

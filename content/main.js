@@ -8,16 +8,9 @@
   const BRIDGE_SOURCE_PAGE = "PIKPAK_PAGE_SCRIPT";
   const BRIDGE_SOURCE_EXT = "PIKPAK_INJECTOR_SCRIPT";
 
-  let pendingRequests = new Map();
-  let currentShareId = null;
-  let currentParentId = "";
-  let resolvedShareData = null;
-  let activeStreamData = null;
-  let isUnlocked = false;
-
-  let currentPlaylist = [];
-  let currentVideoIndex = -1;
-  let isAutoUnlocking = false;
+  let pendingRequests = new Map(), currentShareId = null, currentParentId = "";
+  let resolvedShareData = null, activeStreamData = null, isUnlocked = false;
+  let currentPlaylist = [], currentVideoIndex = -1, isAutoUnlocking = false;
 
   // ====== 1. Communication Bridge ======
   function sendToExtension(action, payload = {}) {
@@ -62,16 +55,20 @@
   // ====== 3. Share Context Extractor ======
   function getShareContext() {
     const net = window.PikPakNetwork ? window.PikPakNetwork.getIntercepted() : {};
-    let shareId = net.shareId || null, parentId = net.parentId || "";
+    let shareId = net.shareId || null, parentId = net.parentId || "", fileId = net.fileId || "";
     const sIndex = window.location.href.indexOf("/s/");
     if (sIndex !== -1) {
       const segs = window.location.href.substring(sIndex + 3).split(/[?#]/)[0].split("/").filter(Boolean);
-      if (segs.length >= 1) { if (!shareId) shareId = segs[0]; if (!parentId && segs.length > 1) parentId = segs[segs.length - 1]; }
+      if (!shareId) shareId = segs[0];
+      if (segs.length === 2) { parentId = parentId || segs[1]; fileId = fileId || segs[1]; }
+      else if (segs.length >= 3) { parentId = parentId || segs[1]; fileId = fileId || segs[segs.length - 1]; }
     }
     const sp = new URLSearchParams(window.location.search);
-    if (!shareId && sp.get("share_id")) shareId = sp.get("share_id");
-    if (!parentId && sp.get("parent_id")) parentId = sp.get("parent_id");
-    return { shareId, parentId, fileId: net.fileId || sp.get("file_id") };
+    return {
+      shareId: shareId || sp.get("share_id") || null,
+      parentId: parentId || sp.get("parent_id") || "",
+      fileId: fileId || sp.get("file_id") || ""
+    };
   }
 
   // ====== 4. Suppress Limit Modals, Harvest Thumbnails & Badges ======
@@ -112,20 +109,16 @@
       try {
         const comp = itemEl.__vueParentComponent || itemEl.__vnode?.ctx;
         vItem = comp?.props?.item || comp?.setupState?.item || comp?.data?.item || itemEl.__vue__?.item;
-        if (vItem) {
-          const s = parseInt(vItem.params?.duration || vItem.medias?.[0]?.video?.duration || 0, 10);
-          if (s > 0) durationStr = formatDuration(s);
-        }
+        const s = parseInt(vItem?.params?.duration || vItem?.medias?.[0]?.video?.duration || 0, 10);
+        if (s > 0) durationStr = formatDuration(s);
       } catch (_) {}
 
       const nameEl = itemEl.querySelector('.name .ellipsis, .name, [class*="file-name"], [class*="title"]');
-      const alt = itemEl.querySelector('img')?.alt || '';
-      const rawName = (nameEl?.textContent || alt || itemEl.innerText || '').trim().split('\n')[0].trim().toLowerCase();
+      const rawName = (nameEl?.textContent || itemEl.querySelector('img')?.alt || itemEl.innerText || '').trim().split('\n')[0].trim().toLowerCase();
 
       if (!durationStr && currentPlaylist?.length > 0) {
         const matched = currentPlaylist.find((v) => v?.name && (rawName.includes(v.name.toLowerCase()) || v.name.toLowerCase().includes(rawName)));
-        if (matched?.durationText) durationStr = matched.durationText;
-        else if (matched?.duration > 0) durationStr = formatDuration(matched.duration);
+        durationStr = matched?.durationText || (matched?.duration > 0 ? formatDuration(matched.duration) : "");
       }
 
       if (durationStr && !hasDuration) {
@@ -143,11 +136,9 @@
         }
       }
       const fc = thumb.querySelector('.folder-cover');
-      if (fc && !fc.querySelector('.pp-folder-blur')) {
-        const fImg = fc.querySelector('img');
-        if (fImg?.src) {
-          const b = document.createElement('div'); b.className = 'pp-folder-blur'; b.style.backgroundImage = `url("${fImg.src}")`; fc.prepend(b);
-        }
+      const fImg = fc && !fc.querySelector('.pp-folder-blur') ? fc.querySelector('img') : null;
+      if (fImg?.src) {
+        const b = document.createElement('div'); b.className = 'pp-folder-blur'; b.style.backgroundImage = `url("${fImg.src}")`; fc.prepend(b);
       }
     });
   }
@@ -216,8 +207,9 @@
 
   async function loadAndPlayFile(shareId, fileId) {
     try {
+      currentShareId = shareId;
       const streamData = await sendToExtension("GET_STREAM_URL", { shareId, fileId });
-      activeStreamData = streamData;
+      activeStreamData = { ...streamData, fileId };
       const net = window.PikPakNetwork ? window.PikPakNetwork.getIntercepted() : {};
       const streamUrl = streamData.primaryUrl || (streamData.streams && streamData.streams[0]?.url) || net.streamUrl;
       if (!streamUrl) throw new Error("Không lấy được stream URL!");
@@ -267,7 +259,8 @@
       }
       if (shareId && currentPlaylist.length > 0) {
         currentVideo.dataset.ppUnlocked = "true"; updateControls();
-        await loadAndPlayFile(shareId, currentPlaylist[Math.max(0, currentVideoIndex)].id);
+        const targetIdx = currentVideoIndex >= 0 ? currentVideoIndex : 0;
+        await loadAndPlayFile(shareId, currentPlaylist[targetIdx].id);
       } else if (shareId && (fileId || parentId)) {
         currentVideo.dataset.ppUnlocked = "true";
         await loadAndPlayFile(shareId, fileId || parentId);
@@ -378,28 +371,17 @@
       currentVideoIndex = playIdx;
       loadAndPlayFile(shareId, targetFileId);
     } else {
-      const netPlaylist = window.PikPakNetwork?.getIntercepted()?.playlist;
-      if (netPlaylist?.length > 0) {
-        currentPlaylist = netPlaylist;
-        const target = currentPlaylist.find((v) => itemText.includes(v.name)) || currentPlaylist[0];
+      const target = currentPlaylist?.find((v) => itemText.includes(v.name)) || currentPlaylist?.[0];
+      if (target) {
         currentVideoIndex = currentPlaylist.indexOf(target);
         loadAndPlayFile(shareId, target.id);
       } else {
         const net = window.PikPakNetwork ? window.PikPakNetwork.getIntercepted() : {};
         if (net.streamUrl) applyDirectStream(net.streamUrl);
-        else {
-          sendToExtension("RESOLVE_SHARE", { shareId }).then((res) => {
-            if (res?.mediaFiles?.length > 0 || res?.videos?.length > 0) {
-              currentPlaylist = res.mediaFiles || res.videos;
-              harvestPikPakThumbnails();
-              const target = currentPlaylist.find((v) => itemText.includes(v.name)) || currentPlaylist[0];
-              loadAndPlayFile(shareId, target.id);
-            } else {
-              const netLater = window.PikPakNetwork ? window.PikPakNetwork.getIntercepted() : {};
-              if (netLater.streamUrl) applyDirectStream(netLater.streamUrl);
-            }
-          }).catch((err) => showToast("Lỗi mở media: " + err.message, true));
-        }
+        else sendToExtension("RESOLVE_SHARE", { shareId }).then((res) => {
+          const list = res?.mediaFiles || res?.videos || [];
+          if (list.length > 0) { currentPlaylist = list; harvestPikPakThumbnails(); loadAndPlayFile(shareId, list[0].id); }
+        }).catch((err) => showToast("Lỗi mở media: " + err.message, true));
       }
     }
   }
@@ -411,7 +393,7 @@
 
   async function prefetchPlaylist() {
     if (isPrefetching) return;
-    const { shareId, parentId } = getShareContext();
+    const { shareId, parentId, fileId } = getShareContext();
     if (!shareId) return;
 
     const netPlaylist = window.PikPakNetwork?.getIntercepted()?.playlist;
@@ -430,10 +412,21 @@
     isPrefetching = true;
 
     try {
-      const res = await sendToExtension("RESOLVE_SHARE", { shareId, parentId });
+      let res = await sendToExtension("RESOLVE_SHARE", { shareId, parentId });
+      if ((!res?.mediaFiles?.length && !res?.videos?.length) && parentId) {
+        try {
+          const rootRes = await sendToExtension("RESOLVE_SHARE", { shareId, parentId: "" });
+          if (rootRes?.mediaFiles?.length > 0 || rootRes?.videos?.length > 0) res = rootRes;
+        } catch (_) {}
+      }
       if (res?.mediaFiles?.length > 0 || res?.videos?.length > 0) {
         currentPlaylist = res.mediaFiles || res.videos;
         resolvedShareData = res;
+        const targetId = res.targetFileId || fileId;
+        if (targetId && currentPlaylist.length > 0) {
+          const tIdx = currentPlaylist.findIndex((v) => v.id === targetId);
+          if (tIdx !== -1) currentVideoIndex = tIdx;
+        }
         harvestPikPakThumbnails();
         updateControls();
       }
@@ -460,7 +453,7 @@
       return;
     }
 
-    if (shareId && (shareId !== currentShareId || parentId !== currentParentId)) {
+    if (shareId && (shareId !== currentShareId || (parentId !== currentParentId && !currentPlaylist.some((v) => v.id === parentId)))) {
       currentShareId = shareId;
       currentParentId = parentId;
       currentPlaylist = [];
