@@ -10,11 +10,14 @@
 
   // Inject stylesheet for player UI
   function injectStyles() {
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.type = "text/css";
-    link.href = chrome.runtime.getURL("player/player.css");
-    (document.head || document.documentElement).appendChild(link);
+    const toInject = ["player/player.css", "content/pikpak-cards.css"];
+    toInject.forEach((path) => {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.type = "text/css";
+      link.href = chrome.runtime.getURL(path);
+      (document.head || document.documentElement).appendChild(link);
+    });
   }
 
   // Inject modular player and content scripts in dependency order into page execution context
@@ -26,6 +29,7 @@
       "player/player-drawer.js",
       "player/player-preview.js",
       "player/player-template.js",
+      "player/player-image.js",
       "player/player.js",
       "content/main.js",
     ];

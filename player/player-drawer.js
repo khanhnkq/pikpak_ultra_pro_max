@@ -16,7 +16,7 @@
           <div class="pp-drawer-header">
             <div class="pp-drawer-title">
               ${icons.playlist || ""}
-              <span>Danh sách video</span>
+              <span>Danh sách media</span>
               <span class="pp-drawer-count" id="pp-drawer-count">1 / 1</span>
             </div>
             <button class="pp-drawer-close" id="pp-drawer-close" title="Đóng (Phím E hoặc Esc)">✕</button>
@@ -71,12 +71,15 @@
         .map((v, i) => {
           const isCur = i === currentIndex;
           const thumb = v.thumbnailLink || "";
+          const isImg = v.type === "image" || v.isImage || /\.(jpe?g|png|webp|gif|bmp|svg|avif|heic)/i.test(v.name || "");
+          const typeBadge = isImg ? "Ảnh" : (v.durationText || "Video");
+          const fallbackIcon = isImg ? (icons.image || "🖼️") : (icons.play || "▶");
           return `
             <div class="pp-thumb-card ${isCur ? "active" : ""}" data-index="${i}">
-              ${thumb ? `<img src="${thumb}" class="pp-thumb-img" loading="lazy" />` : `<div class="pp-thumb-fallback">${icons.play || "▶"}</div>`}
+              ${thumb ? `<img src="${thumb}" class="pp-thumb-img" loading="lazy" />` : `<div class="pp-thumb-fallback">${fallbackIcon}</div>`}
               <div class="pp-thumb-overlay">
-                ${isCur ? `<span class="pp-thumb-badge">Đang phát</span>` : ""}
-                ${v.durationText ? `<span class="pp-thumb-duration">${v.durationText}</span>` : ""}
+                ${isCur ? `<span class="pp-thumb-badge">${isImg ? "Đang xem" : "Đang phát"}</span>` : ""}
+                <span class="pp-thumb-duration">${typeBadge}</span>
                 <span class="pp-thumb-idx">#${i + 1}</span>
                 <span class="pp-thumb-name" title="${v.name}">${v.name}</span>
               </div>

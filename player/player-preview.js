@@ -13,7 +13,7 @@
       this.currentStreamUrl = null;
       this.isSeeking = false;
       this.pendingTime = null;
-      this.seekThrottleMs = 120;
+      this.seekThrottleMs = 150;
       this.lastSeekAt = 0;
       this._ready = false;
     }
@@ -24,19 +24,25 @@
       this.timeLabel = document.getElementById("pp-scrub-preview-time");
       if (!this.previewVideo) return;
 
-      this.previewVideo.crossOrigin = "anonymous";
+      // NOTE: Do NOT set crossOrigin="anonymous" — PikPak stream URLs use
+      // auth tokens and don't send CORS headers, so anonymous mode blocks loading.
       this.previewVideo.muted = true;
       this.previewVideo.preload = "auto";
 
-      this.previewVideo.addEventListener("loadedmetadata", () => {
+      const onReady = () => {
         this._ready = true;
         if (this.pendingTime !== null) {
           this._doSeek(this.pendingTime);
           this.pendingTime = null;
         }
-      });
+      };
+
+      this.previewVideo.addEventListener("loadedmetadata", onReady);
+      this.previewVideo.addEventListener("canplay", onReady); // fallback for some stream types
 
       this.previewVideo.addEventListener("seeked", () => {
+        // Freeze frame — don't let it play forward
+        this.previewVideo.pause();
         this.isSeeking = false;
         if (this.pendingTime !== null) {
           const t = this.pendingTime;
@@ -58,22 +64,36 @@
       this.currentStreamUrl = streamUrl;
       this.previewVideo.src = streamUrl;
       this.previewVideo.load();
+      // Browser won't buffer until play() is called.
+      // play().then(pause()) primes the decoder so seek works without playing.
+      this.previewVideo.play().then(() => {
+        this.previewVideo.pause();
+      }).catch(() => {
+        // Autoplay blocked — try muted
+        this.previewVideo.muted = true;
+        this.previewVideo.play().then(() => this.previewVideo.pause()).catch(() => {});
+      });
     }
 
     _doSeek(time) {
       if (!this.previewVideo || !isFinite(time)) return;
-      try { this.isSeeking = true; this.previewVideo.currentTime = time; }
-      catch (_) { this.isSeeking = false; }
+      try {
+        this.isSeeking = true;
+        this.previewVideo.currentTime = time;
+      } catch (_) {
+        this.isSeeking = false;
+      }
     }
 
     updateHover(e, pos, duration) {
       if (!this.tooltip) this.init();
       if (!this.tooltip || !duration) return;
 
-      // Auto-grab source from main player if not set yet
+      // Auto-grab source from main player if setSource was not yet called
       if (!this.currentStreamUrl) {
         const src = this.player?.modalVideo?.currentSrc || this.player?.currentStreamUrl;
         if (src) this.setSource(src);
+        else return; // no source yet, nothing to show
       }
 
       const targetTime = Math.max(0, Math.min(duration * 0.9999, pos * duration));
@@ -84,7 +104,7 @@
       const clampedX = Math.max(82, Math.min(rect.width - 82, e.clientX - rect.left));
       this.tooltip.style.left = `${(clampedX / rect.width) * 100}%`;
 
-      // Throttle seek rate
+      // Throttle seeks to avoid hammering decoder
       const now = Date.now();
       if (now - this.lastSeekAt < this.seekThrottleMs) { this.pendingTime = targetTime; return; }
       this.lastSeekAt = now;
@@ -107,3 +127,4 @@
 
   root.PlayerPreviewManager = PlayerPreviewManager;
 })(typeof globalThis !== "undefined" ? globalThis : typeof self !== "undefined" ? self : window);
+

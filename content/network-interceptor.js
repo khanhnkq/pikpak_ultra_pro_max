@@ -47,29 +47,33 @@
       autoInterceptedFileId = data.file_info.id;
     }
     if (data.files && Array.isArray(data.files)) {
-      const videos = [];
+      const mediaList = [];
       data.files.forEach((item) => {
         if (item && item.kind !== "drive#folder") {
           const ext = (item.name || "").substring((item.name || "").lastIndexOf(".")).toLowerCase();
           const isVid = /\.(mp4|mkv|avi|mov|wmv|flv|webm|ts|m4v|3gp|rmvb)/i.test(ext) || (item.mime_type || "").startsWith("video/");
-          if (isVid) {
+          const isImg = /\.(jpe?g|png|webp|gif|bmp|svg|avif|heic|tiff)/i.test(ext) || (item.mime_type || "").startsWith("image/");
+          if (isVid || isImg) {
             const durSec = parseInt(item.params?.duration || item.medias?.[0]?.video?.duration || 0, 10);
-            videos.push({
+            mediaList.push({
               id: item.id,
               name: item.name,
               size: parseInt(item.size, 10) || 0,
               duration: durSec,
               durationText: formatDuration(durSec),
               mimeType: item.mime_type,
-              isVideo: true,
+              isVideo: isVid,
+              isImage: isImg,
+              type: isVid ? "video" : "image",
               thumbnailLink: item.thumbnail_link || item.icon_link || "",
+              webContentLink: item.web_content_link || "",
             });
           }
         }
       });
-      if (videos.length > 0) {
-        console.log(`%c[PikPak Ultra] 🎯 Bắt được ${videos.length} video từ API:`, LOG_SUCCESS, videos);
-        notifyPlaylist(videos);
+      if (mediaList.length > 0) {
+        console.log(`%c[PikPak Ultra] 🎯 Bắt được ${mediaList.length} media từ API:`, LOG_SUCCESS, mediaList);
+        notifyPlaylist(mediaList);
       }
     }
     let streamUrl = "";

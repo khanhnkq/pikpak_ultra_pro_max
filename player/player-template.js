@@ -49,13 +49,20 @@
         <!-- Custom HTML5 Video without native controls -->
         <video id="pikpak-ultra-modal-video" playsinline preload="auto"></video>
 
+        <!-- Dedicated Image Viewer Stage -->
+        <div class="pp-modal-image-stage" id="pp-modal-image-stage" style="display: none;">
+          <div class="pp-image-canvas-wrap" id="pp-image-canvas-wrap">
+            <img id="pikpak-ultra-modal-image" class="pp-modal-image" draggable="false" alt="PikPak Media Preview" />
+          </div>
+        </div>
+
         <!-- Bottom Video Thumbnail Carousel Drawer -->
         ${drawerHtml}
 
         <!-- Bottom Controls Overlay Scrim -->
         <div class="pp-player-controls" id="pp-player-controls">
-          <!-- Scrubber / Progress Bar -->
-          <div class="pp-progress-area" id="pp-progress-area">
+          <!-- Scrubber / Progress Bar (Video Only) -->
+          <div class="pp-progress-area pp-video-only" id="pp-progress-area">
             <div class="pp-scrub-tooltip" id="pp-scrub-tooltip">
               <div class="pp-scrub-preview-frame">
                 <video id="pp-scrub-preview-video" class="pp-scrub-preview-video" muted playsinline preload="auto"></video>
@@ -74,18 +81,18 @@
           <div class="pp-controls-row">
             <!-- Left Group -->
             <div class="pp-controls-group">
-              <button id="pp-ctrl-play" class="pp-ctrl-btn" title="Phát / Tạm dừng (Space / K)">
+              <button id="pp-ctrl-play" class="pp-ctrl-btn pp-video-only" title="Phát / Tạm dừng (Space / K)">
                 ${icons.play || ""}
               </button>
-              <button id="pp-ctrl-prev" class="pp-ctrl-btn" title="Video trước ([ / P)">
+              <button id="pp-ctrl-prev" class="pp-ctrl-btn" title="Mục trước ([ / P / ←)">
                 ${icons.prev || ""}
               </button>
-              <button id="pp-ctrl-next" class="pp-ctrl-btn" title="Video tiếp (] / N)">
+              <button id="pp-ctrl-next" class="pp-ctrl-btn" title="Mục tiếp (] / N / →)">
                 ${icons.next || ""}
               </button>
 
-              <!-- Volume Group -->
-              <div class="pp-volume-group">
+              <!-- Video-only Volume Group -->
+              <div class="pp-volume-group pp-video-only">
                 <button id="pp-ctrl-volume" class="pp-ctrl-btn" title="Tắt / Bật tiếng (M)">
                   ${icons.volHigh || ""}
                 </button>
@@ -94,22 +101,39 @@
                 </div>
               </div>
 
-              <!-- Time Display -->
-              <div class="pp-time-display">
+              <!-- Video-only Time Display -->
+              <div class="pp-time-display pp-video-only">
                 <span class="pp-time-current" id="pp-time-current">00:00</span>
                 <span>/</span>
                 <span class="pp-time-total" id="pp-time-total">00:00</span>
+              </div>
+
+              <!-- Image-only Controls Group -->
+              <div class="pp-image-controls-group pp-image-only" id="pp-image-controls-group">
+                <button id="pp-img-zoom-out" class="pp-ctrl-btn" title="Thu nhỏ (-)">
+                  ${icons.zoomOut || ""}
+                </button>
+                <button id="pp-img-zoom-badge" class="pp-img-zoom-badge" title="Tỷ lệ Zoom (Click để Reset về Fit / 100%)">
+                  Fit
+                </button>
+                <button id="pp-img-zoom-in" class="pp-ctrl-btn" title="Phóng to (+)">
+                  ${icons.zoomIn || ""}
+                </button>
+                <button id="pp-img-rotate" class="pp-ctrl-btn" title="Xoay 90° (Phím R)">
+                  ${icons.rotate || ""}
+                </button>
+                <div id="pp-img-dimensions" class="pp-img-dimension-badge" style="display: none;"></div>
               </div>
             </div>
 
             <!-- Right Group -->
             <div class="pp-controls-group">
-              <button id="pp-ctrl-playlist" class="pp-ctrl-btn" title="Danh sách tập (Phím E)">
+              <button id="pp-ctrl-playlist" class="pp-ctrl-btn" title="Danh sách tập / ảnh (Phím E)">
                 ${icons.playlist || ""}
               </button>
 
-              <!-- Speed Menu -->
-              <div class="pp-menu-wrap">
+              <!-- Speed Menu (Video Only) -->
+              <div class="pp-menu-wrap pp-video-only">
                 <button id="pp-speed-btn" class="pp-menu-btn" title="Tốc độ phát">
                   <span id="pp-speed-label">1.0x</span>
                 </button>
@@ -123,15 +147,15 @@
                 </div>
               </div>
 
-              <!-- Quality Menu -->
-              <div class="pp-menu-wrap" id="pp-quality-wrap" style="display: none;">
+              <!-- Quality Menu (Video Only) -->
+              <div class="pp-menu-wrap pp-video-only" id="pp-quality-wrap" style="display: none;">
                 <button id="pp-quality-btn" class="pp-menu-btn" title="Chất lượng">
                   <span id="pp-quality-label">1080P</span>
                 </button>
                 <div class="pp-dropdown-menu" id="pp-quality-menu"></div>
               </div>
 
-              <button id="pp-ctrl-pip" class="pp-ctrl-btn" title="Hình trong hình (PiP)">
+              <button id="pp-ctrl-pip" class="pp-ctrl-btn pp-video-only" title="Hình trong hình (PiP)">
                 ${icons.pip || ""}
               </button>
               <button id="pp-ctrl-shortcuts" class="pp-ctrl-btn" title="Danh sách phím tắt (?)">

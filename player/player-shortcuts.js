@@ -73,27 +73,86 @@
 
     initGlobalKeyListeners() {
       window.addEventListener("keydown", (e) => {
-        if (!this.player.isModalOpen || !this.player.modalVideo) return;
-
-        // Ignore typing in input fields
+        if (!this.player.isModalOpen) return;
         if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
 
-        const v = this.player.modalVideo;
-        const dur = v.duration || 0;
         const icons = root.PikPakIcons || {};
 
+        if (e.key === "Escape") {
+          const scModal = document.getElementById("pp-shortcuts-modal");
+          const drawer = document.getElementById("pp-playlist-drawer");
+          if (scModal && scModal.classList.contains("show")) scModal.classList.remove("show");
+          else if (drawer && drawer.classList.contains("show")) this.player.drawer?.toggle(false);
+          else this.player.closeCinemaModal();
+          return;
+        }
+
+        // Image Mode Keyboard Shortcuts
+        if (this.player.isImageMode) {
+          switch (e.key) {
+            case "ArrowLeft":
+            case "[":
+            case "p":
+            case "P":
+              e.preventDefault();
+              if (this.player.navigationHandlers?.onPrev) {
+                this.showHud("Mục trước", icons.prev);
+                this.player.navigationHandlers.onPrev();
+              }
+              break;
+            case "ArrowRight":
+            case "]":
+            case "n":
+            case "N":
+              e.preventDefault();
+              if (this.player.navigationHandlers?.onNext) {
+                this.showHud("Mục tiếp", icons.next);
+                this.player.navigationHandlers.onNext();
+              }
+              break;
+            case "+":
+            case "=":
+              e.preventDefault();
+              this.player.imageViewer?.zoom(0.25);
+              break;
+            case "-":
+            case "_":
+              e.preventDefault();
+              this.player.imageViewer?.zoom(-0.25);
+              break;
+            case "0":
+              e.preventDefault();
+              this.player.imageViewer?.resetZoom();
+              break;
+            case "r":
+            case "R":
+              e.preventDefault();
+              this.player.imageViewer?.rotate(90);
+              break;
+            case "f":
+            case "F":
+              e.preventDefault();
+              this.player.toggleFullscreen();
+              break;
+            case "e":
+            case "E":
+              e.preventDefault();
+              this.player.drawer?.toggle();
+              break;
+            case "?":
+              e.preventDefault();
+              this.toggleShortcutsModal();
+              break;
+          }
+          this.player.resetIdleTimer();
+          return;
+        }
+
+        const v = this.player.modalVideo;
+        if (!v) return;
+        const dur = v.duration || 0;
+
         switch (e.key) {
-          case "Escape":
-            const scModal = document.getElementById("pp-shortcuts-modal");
-            const drawer = document.getElementById("pp-playlist-drawer");
-            if (scModal && scModal.classList.contains("show")) {
-              scModal.classList.remove("show");
-            } else if (drawer && drawer.classList.contains("show")) {
-              this.player.drawer?.toggle(false);
-            } else {
-              this.player.closeCinemaModal();
-            }
-            break;
 
           case " ":
             e.preventDefault();
@@ -237,7 +296,7 @@
       });
 
       window.addEventListener("keyup", (e) => {
-        if (!this.player.isModalOpen || !this.player.modalVideo) return;
+        if (!this.player.isModalOpen || this.player.isImageMode || !this.player.modalVideo) return;
         if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
 
         if (e.key === " ") {
@@ -258,7 +317,7 @@
 
     initMouseListeners() {
       window.addEventListener("mousedown", (e) => {
-        if (!this.player.isModalOpen || e.button !== 0) return;
+        if (!this.player.isModalOpen || this.player.isImageMode || e.button !== 0) return;
         if (e.target.closest("#pp-player-controls, .pp-top-btn, .pp-playlist-drawer, .pp-shortcuts-modal, input")) return;
         const video = this.player.modalVideo;
         if (!video || (e.target !== video && !e.target.closest("#pp-video-container"))) return;
@@ -293,15 +352,15 @@
               <div class="pp-shortcut-row"><span>Tăng tốc 2X (Nhấn giữ)</span><kbd>Giữ Space / → / Chuột</kbd></div>
               <div class="pp-shortcut-row"><span>Tua lùi 5s / 10s</span><kbd>← / J</kbd></div>
               <div class="pp-shortcut-row"><span>Tua tới 5s / 10s</span><kbd>→ / L</kbd></div>
-              <div class="pp-shortcut-row"><span>Tăng âm lượng 10%</span><kbd>↑</kbd></div>
-              <div class="pp-shortcut-row"><span>Giảm âm lượng 10%</span><kbd>↓</kbd></div>
+              <div class="pp-shortcut-row"><span>Tăng / Giảm âm lượng</span><kbd>↑ / ↓</kbd></div>
               <div class="pp-shortcut-row"><span>Tắt / Bật tiếng</span><kbd>M</kbd></div>
               <div class="pp-shortcut-row"><span>Toàn màn hình</span><kbd>F</kbd></div>
-              <div class="pp-shortcut-row"><span>Bật danh sách tập</span><kbd>E</kbd></div>
-              <div class="pp-shortcut-row"><span>Video tiếp theo</span><kbd>] / N</kbd></div>
-              <div class="pp-shortcut-row"><span>Video trước</span><kbd>[ / P</kbd></div>
+              <div class="pp-shortcut-row"><span>Bật danh sách tập / ảnh</span><kbd>E</kbd></div>
+              <div class="pp-shortcut-row"><span>Mục tiếp theo / trước</span><kbd>] / [ (hoặc N / P)</kbd></div>
+              <div class="pp-shortcut-row"><span>Phóng to / Thu nhỏ ảnh</span><kbd>+ / - (hoặc Cuộn chuột)</kbd></div>
+              <div class="pp-shortcut-row"><span>Đặt lại cỡ ảnh / Kéo rê</span><kbd>Phím 0 / Kéo chuột</kbd></div>
+              <div class="pp-shortcut-row"><span>Xoay ảnh 90°</span><kbd>R</kbd></div>
               <div class="pp-shortcut-row"><span>Tăng / Giảm tốc độ</span><kbd>&gt; / &lt;</kbd></div>
-              <div class="pp-shortcut-row"><span>Tua nhanh 0% - 90%</span><kbd>0 - 9</kbd></div>
               <div class="pp-shortcut-row"><span>Bật / Tắt phím tắt</span><kbd>?</kbd></div>
               <div class="pp-shortcut-row"><span>Đóng Rạp Chiếu</span><kbd>Esc</kbd></div>
             </div>

@@ -1,0 +1,212 @@
+/**
+ * PikPak Ultra Pro Max - Card Folder UI Enhancement
+ * Option 1: Thu gọn container ngoài cùng, loại bỏ toàn bộ khoảng trắng thừa bên trên.
+ * Cố định kích thước khung 16:9 gọn gàng, nút chọn & 3-chấm nằm đè lên góc trên ảnh.
+ * Ảnh hiển thị đầy đủ (contain), và TUYỆT ĐỐI không đụng tới card video hay ảnh.
+ * Toàn bộ màu sắc, hiệu ứng kính và bo góc tuân thủ 100% tokens.css Design System.
+ */
+
+/* ── 1. Loại bỏ các layer 3D che hình ảnh của folder (.front và .back) ── */
+.folder-cover .front,
+.folder-cover .back {
+  display: none !important;
+}
+
+/* ── 2. Thu gọn chiều cao container ngoài cùng của card folder ──────── */
+.file-item:has(.folder-cover),
+.grid.file-item:has(.folder-cover) {
+  height: auto !important;
+  min-height: 0 !important;
+}
+
+/* ── 3. Thu gọn thumbnail-wrap về tỉ lệ chuẩn 16:9 gọn gàng ─────────── */
+.thumbnail-wrap:has(.folder-cover) {
+  position: relative !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  aspect-ratio: 16 / 9 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  border-radius: var(--pp-radius-sm, 8px) !important;
+  background: radial-gradient(ellipse at center, rgba(30, 36, 50, 0.7) 0%, rgba(8, 10, 15, 0.95) 100%) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+}
+
+/* ── 4. Thumbnail & folder-cover chiếm trọn 100% khung 16:9 ────────── */
+.thumbnail:has(.folder-cover) {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border-radius: inherit !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.folder-cover {
+  transform: none !important;
+  perspective: none !important;
+  transform-style: flat !important;
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  border-radius: inherit !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background-color: transparent !important;
+}
+
+/* Gradient blur background cho phần dư hai bên của thumbnail ảnh */
+.pp-folder-blur {
+  position: absolute !important;
+  inset: -20px !important;
+  background-size: cover !important;
+  background-position: center !important;
+  filter: blur(28px) brightness(0.65) saturate(1.4) !important;
+  transform: scale(1.15) !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
+  opacity: 0.92 !important;
+}
+
+/* Lớp phủ gradient vignette tạo chiều sâu và làm dịu phần viền */
+.folder-cover::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.1) 0%, rgba(6, 8, 14, 0.75) 100%) !important;
+  z-index: 2 !important;
+  pointer-events: none !important;
+}
+
+/* ── 5. Khung chứa .cover & el-image chiếm trọn diện tích ───────────── */
+.folder-cover .cover {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: inherit !important;
+  overflow: hidden !important;
+  transform: none !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: transparent !important;
+  z-index: 3 !important;
+}
+
+.folder-cover .cover .el-image {
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: inherit !important;
+  background: transparent !important;
+}
+
+/* ── 6. Ảnh thumbnail: HIỂN THỊ ĐẦY ĐỦ KHÔNG BỊ CẮT XÉN (contain) ───── */
+.folder-cover .cover .el-image .el-image__inner {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: contain !important;
+  object-position: center !important;
+  display: block !important;
+  border-radius: inherit !important;
+  transition: filter 0.2s ease !important;
+}
+
+/* Trạng thái folder chưa có ảnh (placeholder rỗng) */
+.folder-cover .cover .el-image .empty {
+  width: 100% !important;
+  height: 100% !important;
+  background-color: var(--pp-glass-bg, rgba(18, 20, 26, 0.4)) !important;
+}
+
+/* ── 7. Nút checkbox & 3-chấm nằm đè lên góc trên ảnh (như card video) ── */
+.thumbnail-wrap:has(.folder-cover) .grid-operation {
+  position: absolute !important;
+  top: 6px !important;
+  left: 6px !important;
+  right: 6px !important;
+  width: calc(100% - 12px) !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  z-index: 10 !important;
+  pointer-events: auto !important;
+}
+
+/* ── 8. Hiệu ứng hover tinh tế ─────────────────────────────────────── */
+.thumbnail:hover .folder-cover .cover .el-image .el-image__inner,
+.folder-cover:hover .cover .el-image .el-image__inner {
+  filter: brightness(1.08) !important;
+}
+
+/* ── 9. Ẩn nút play mặc định trên thumbnail của PikPak ─────────────── */
+.thumbnail .play-icon,
+.thumbnail-wrap .play-icon,
+.file-item .play-icon {
+  display: none !important;
+}
+
+/* ── 10. Type Badges nhận diện Video, Folder, Image ở góc dưới trái ─── */
+.pp-type-badge {
+  position: absolute !important;
+  bottom: 6px !important;
+  left: 6px !important;
+  z-index: 20 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 22px !important;
+  height: 22px !important;
+  border-radius: var(--pp-radius-sm, 8px) !important;
+  background: var(--pp-glass-bg, rgba(18, 20, 26, 0.65)) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  color: var(--pp-icon-color, rgba(255, 255, 255, 0.88)) !important;
+  border: 1px solid var(--pp-glass-border, rgba(255, 255, 255, 0.12)) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45) !important;
+  pointer-events: none !important;
+  line-height: 1 !important;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease !important;
+}
+
+.pp-type-badge svg {
+  display: block !important;
+  width: 13px !important;
+  height: 13px !important;
+  color: currentColor !important;
+  stroke: currentColor !important;
+}
+
+/* Hover effect tuân thủ design system tokens */
+.thumbnail:hover .pp-type-badge,
+.thumbnail-wrap:hover .pp-type-badge {
+  background: var(--pp-glass-hover, rgba(26, 30, 40, 0.85)) !important;
+  border-color: var(--pp-glass-border-hover, rgba(255, 255, 255, 0.24)) !important;
+  color: var(--pp-icon-hover, #ffffff) !important;
+}
+
+/* ── 11. Gradient blur nâng cao cho card video của PikPak ──────────── */
+.thumbnail .file-cover .blur {
+  filter: blur(24px) brightness(0.65) saturate(1.35) !important;
+  transform: scale(1.15) !important;
+  opacity: 0.92 !important;
+}
+

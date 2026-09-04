@@ -51,11 +51,13 @@
       "resources": [
         "player/player.css",
         "player/styles/*.css",
+        "content/pikpak-cards.css",
         "player/icons.js",
         "player/player-shortcuts.js",
         "player/player-drawer.js",
         "player/player-preview.js",
         "player/player-template.js",
+        "player/player-image.js",
         "player/player.js",
         "content/network-interceptor.js",
         "content/main.js",
