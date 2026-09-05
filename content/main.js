@@ -64,19 +64,23 @@
   // ====== 3. Share Context Extractor ======
   function getShareContext() {
     const net = window.PikPakNetwork ? window.PikPakNetwork.getIntercepted() : {};
-    let shareId = net.shareId || null, parentId = net.parentId || "", fileId = net.fileId || "";
+    let shareId = null, parentId = "", fileId = "";
     const sIndex = window.location.href.indexOf("/s/");
     if (sIndex !== -1) {
       const segs = window.location.href.substring(sIndex + 3).split(/[?#]/)[0].split("/").filter(Boolean);
-      if (!shareId) shareId = segs[0];
-      if (segs.length === 2) { parentId = parentId || segs[1]; fileId = fileId || segs[1]; }
-      else if (segs.length >= 3) { parentId = parentId || segs[1]; fileId = fileId || segs[segs.length - 1]; }
+      shareId = segs[0] || null;
+      // PikPak uses the last path segment as the current folder ID, including
+      // nested folder routes. Never treat a URL folder ID as a video file ID:
+      // on reload that would make the extension try to restore the folder.
+      if (segs.length > 1) parentId = segs[segs.length - 1];
     }
     const sp = new URLSearchParams(window.location.search);
     return {
-      shareId: shareId || sp.get("share_id") || null,
-      parentId: parentId || sp.get("parent_id") || "",
-      fileId: fileId || sp.get("file_id") || ""
+      shareId: shareId || net.shareId || sp.get("share_id") || null,
+      // The API request is authoritative on nested routes; use the URL only
+      // as a fallback because the route may contain both folder and item IDs.
+      parentId: net.parentId || sp.get("parent_id") || parentId || "",
+      fileId: net.fileId || sp.get("file_id") || fileId || ""
     };
   }
 
@@ -598,9 +602,13 @@
         currentVideo.dataset.ppUnlocked = "true"; updateControls();
         const targetIdx = currentVideoIndex >= 0 ? currentVideoIndex : 0;
         await loadAndPlayFile(shareId, currentPlaylist[targetIdx].id);
-      } else if (shareId && (fileId || parentId)) {
+      } else if (shareId && fileId) {
         currentVideo.dataset.ppUnlocked = "true";
-        await loadAndPlayFile(shareId, fileId || parentId);
+        await loadAndPlayFile(shareId, fileId);
+      } else if (shareId && parentId) {
+        // Nested folder reloads have a parentId but no fileId. Resolve the
+        // folder playlist first; never try to restore the folder as a video.
+        prefetchPlaylist();
       } else {
         currentVideo.dataset.ppUnlocked = "failed";
         window.PikPakPlayer?.hideLoading?.();
@@ -834,9 +842,16 @@
         currentVideoIndex = currentPlaylist.indexOf(target);
         loadAndPlayFile(shareId, target.id);
       } else {
-        sendToExtension("RESOLVE_SHARE", { shareId }).then((res) => {
+        const { parentId } = getShareContext();
+        sendToExtension("RESOLVE_SHARE", { shareId, parentId }).then((res) => {
           const list = res?.mediaFiles || res?.videos || [];
-          if (list.length > 0) { currentPlaylist = sortPlaylist(list); harvestPikPakThumbnails(); loadAndPlayFile(shareId, currentPlaylist[0].id); }
+          if (list.length > 0) {
+            currentPlaylist = sortPlaylist(list);
+            const target = currentPlaylist.find((v) => v?.name && (itemText.includes(v.name) || v.name.includes(itemText.split("\n")[0]))) || currentPlaylist[0];
+            currentVideoIndex = currentPlaylist.indexOf(target);
+            harvestPikPakThumbnails();
+            loadAndPlayFile(shareId, target.id);
+          }
           else showToast("Không tìm thấy video để lưu vào Cloud.", true);
         }).catch((err) => showToast("Lỗi mở media: " + err.message, true));
       }
@@ -910,6 +925,7 @@
         currentPlaylist = sortPlaylist(netPlaylist);
         harvestPikPakThumbnails();
         updateControls();
+        checkAndAutoUnlock();
       }
       return;
     }
@@ -921,12 +937,6 @@
 
     try {
       let res = await sendToExtension("RESOLVE_SHARE", { shareId, parentId });
-      if ((!res?.mediaFiles?.length && !res?.videos?.length) && parentId) {
-        try {
-          const rootRes = await sendToExtension("RESOLVE_SHARE", { shareId, parentId: "" });
-          if (rootRes?.mediaFiles?.length > 0 || rootRes?.videos?.length > 0) res = rootRes;
-        } catch (_) {}
-      }
       if (res?.mediaFiles?.length > 0 || res?.videos?.length > 0) {
         currentPlaylist = sortPlaylist(res.mediaFiles || res.videos);
         resolvedShareData = res;
@@ -937,8 +947,10 @@
         }
         harvestPikPakThumbnails();
         updateControls();
+        checkAndAutoUnlock();
       }
-    } catch (_) {
+    } catch (err) {
+      console.warn("[PikPak Ultra] Không thể resolve folder hiện tại:", { shareId, parentId, error: err?.message || String(err) });
     } finally {
       isPrefetching = false;
     }
