@@ -704,6 +704,7 @@
 
     closeCinemaModal(shouldRevertHistory = true) {
       if (!this.modalContainer) return;
+      this.shortcuts?.clearPendingBackTimer?.();
       clearTimeout(this.idleTimeout);
       this.idleTimeout = null;
       this.revertHistoryState(shouldRevertHistory);

@@ -13,8 +13,16 @@
       this.spaceHoldTimer = null;
       this.rightArrowHoldTimer = null;
       this.mouseHoldTimer = null;
+      this.pendingBackTimer = null;
       this.initGlobalKeyListeners();
       this.initMouseListeners();
+    }
+
+    clearPendingBackTimer() {
+      if (this.pendingBackTimer) {
+        clearTimeout(this.pendingBackTimer);
+        this.pendingBackTimer = null;
+      }
     }
 
     enableSpeedBoost() {
@@ -76,6 +84,9 @@
         if (!this.player.isModalOpen) return;
         if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
 
+        // Xóa timer Backspace đang chờ nếu có phím tiếp theo được nhấn ngay sau đó (bộ gõ tiếng Việt Telex/VNI)
+        this.clearPendingBackTimer();
+
         const icons = root.PikPakIcons || {};
 
         if (e.key === "Escape") {
@@ -87,12 +98,57 @@
           return;
         }
 
-        // Phím Back / Quay lại: Backspace hoặc Alt+ArrowLeft hoặc BrowserBack
-        if (e.key === "Backspace" || (e.altKey && e.key === "ArrowLeft") || e.key === "BrowserBack") {
+        // Phím Back trình duyệt (Alt + ArrowLeft hoặc nút cứng BrowserBack)
+        if ((e.altKey && e.key === "ArrowLeft") || e.key === "BrowserBack") {
           e.preventDefault();
           e.stopPropagation();
-          console.log("[PikPak Cinema] 🔙 Phím tắt Back/Backspace -> Đang đóng video...");
+          console.log("[PikPak Cinema] 🔙 Phím tắt BrowserBack / Alt+Left -> Đang đóng video...");
           this.player.closeCinemaModal();
+          return;
+        }
+
+        // Phím Backspace: Sử dụng bộ đệm (debounce 80ms) để không bị nhầm lẫn với ký tự xóa của bộ gõ Telex (ví dụ gõ 'ee' thành 'ê')
+        // Khi Drawer hoặc Modal phím tắt đang mở, Backspace ưu tiên đóng Drawer trước thay vì tắt video
+        if (e.key === "Backspace" || e.code === "Backspace") {
+          e.preventDefault();
+          e.stopPropagation();
+          this.pendingBackTimer = setTimeout(() => {
+            this.pendingBackTimer = null;
+            const scModal = document.getElementById("pp-shortcuts-modal");
+            const drawer = document.getElementById("pp-playlist-drawer");
+            if (scModal && scModal.classList.contains("show")) {
+              scModal.classList.remove("show");
+            } else if (drawer && drawer.classList.contains("show")) {
+              this.player.drawer?.toggle(false);
+            } else {
+              console.log("[PikPak Cinema] 🔙 Phím tắt Backspace -> Đang đóng video...");
+              this.player.closeCinemaModal();
+            }
+          }, 80);
+          return;
+        }
+
+        // Xử lý phím E: Bật / Tắt danh sách tập (Drawer) cho cả Video và Ảnh
+        // Hỗ trợ e.code === "KeyE", "e", "E" và các ký tự biến thể Telex (ê, Ê) để bộ gõ tiếng Việt không bao giờ làm lỗi
+        const isKeyE = (e.code === "KeyE" || e.key === "e" || e.key === "E" || e.key === "ê" || e.key === "Ê") && !e.metaKey && !e.ctrlKey && !e.altKey;
+        if (isKeyE) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (this.player.drawer) {
+            this.player.drawer.toggle();
+          }
+          this.player.resetIdleTimer();
+          return;
+        }
+
+        // Xử lý phím F: Bật / Tắt Toàn màn hình (Fullscreen) cho cả Video và Ảnh
+        // Hỗ trợ e.code === "KeyF", "f", "F" và các ký tự ghép Telex khi bấm sau e (è, È)
+        const isKeyF = (e.code === "KeyF" || e.key === "f" || e.key === "F" || e.key === "è" || e.key === "È") && !e.metaKey && !e.ctrlKey && !e.altKey;
+        if (isKeyF) {
+          e.preventDefault();
+          e.stopPropagation();
+          this.player.toggleFullscreen();
+          this.player.resetIdleTimer();
           return;
         }
 
@@ -164,16 +220,6 @@
             case "R":
               e.preventDefault();
               this.player.imageViewer?.rotate(90);
-              break;
-            case "f":
-            case "F":
-              e.preventDefault();
-              this.player.toggleFullscreen();
-              break;
-            case "e":
-            case "E":
-              e.preventDefault();
-              this.player.drawer?.toggle();
               break;
             case "?":
               e.preventDefault();
@@ -266,12 +312,6 @@
             this.showHud(v.muted ? "Tắt tiếng" : `${Math.round(v.volume * 100)}%`, v.muted ? icons.volMute : icons.volHigh);
             break;
 
-          case "f":
-          case "F":
-            e.preventDefault();
-            this.player.toggleFullscreen();
-            break;
-
           case "b":
           case "B":
             e.preventDefault();
@@ -313,14 +353,6 @@
           case "?":
             e.preventDefault();
             this.toggleShortcutsModal();
-            break;
-
-          case "e":
-          case "E":
-            e.preventDefault();
-            if (this.player.drawer) {
-              this.player.drawer.toggle();
-            }
             break;
 
           default:
