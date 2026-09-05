@@ -505,17 +505,26 @@
         };
       }
 
-      // Safeguard for non-native containers like .avi
+      // Safeguard for container & stream selection
       let effectiveStreamUrl = streamUrl;
       const fileName = options.fileName || "";
       const isAviOrNonNative = /\.(avi|wmv|flv|rmvb|rm|asf|divx|vob|ts|m2ts|3gp)(\?|$)/i.test(effectiveStreamUrl || "") ||
         /\.(avi|wmv|flv|rmvb|rm|asf|divx|vob|ts|m2ts|3gp)$/i.test(fileName);
 
-      if (isAviOrNonNative && options.streams && options.streams.length > 0) {
-        const transcoded = options.streams.find((s) => !s.isOriginal && s.url && !s.url.includes("fid=&"));
-        if (transcoded && transcoded.url) {
-          console.log(`[PikPak Cinema] 🛡️ File AVI không thể phát trực tiếp, chọn luồng MP4 (${transcoded.quality}):`, transcoded.url);
-          effectiveStreamUrl = transcoded.url;
+      if (options.streams && options.streams.length > 0) {
+        if (isAviOrNonNative) {
+          const transcoded = options.streams.find((s) => !s.isOriginal && s.url && !s.url.includes("fid=&"));
+          if (transcoded && transcoded.url) {
+            console.log(`[PikPak Cinema] 🛡️ File AVI không thể phát trực tiếp, chọn luồng MP4 (${transcoded.quality}):`, transcoded.url);
+            effectiveStreamUrl = transcoded.url;
+          }
+        } else {
+          // Video thông thường: LUÔN BẮT BUỘC CHỌN BẢN GỐC (Original) để đảm bảo 100% phát mượt mà
+          const origStream = options.streams.find((s) => s.isOriginal && s.url && !s.url.includes("fid=&"));
+          if (origStream && origStream.url) {
+            console.log(`[PikPak Cinema] 🎬 Video chuẩn: Khởi chạy với luồng Original (${origStream.quality}):`, origStream.url);
+            effectiveStreamUrl = origStream.url;
+          }
         }
       }
 
@@ -557,7 +566,7 @@
 
       if (qualityWrap && qualityMenu && options.streams && options.streams.length > 1) {
         qualityWrap.style.display = "block";
-        const curStream = options.streams.find((s) => s.url === effectiveStreamUrl) || options.streams[0];
+        const curStream = options.streams.find((s) => s.url === effectiveStreamUrl) || options.streams.find((s) => s.isOriginal) || options.streams[0];
         const curQuality = curStream?.isOriginal ? "Original" : (curStream?.quality || "Original").split(" ")[0];
         if (qualityLabel) qualityLabel.textContent = curQuality;
 
@@ -589,10 +598,12 @@
           item.addEventListener("click", (e) => {
             e.stopPropagation();
             if (item.dataset.url) {
-              this.changeSource(item.dataset.url, true);
+              const targetUrl = item.dataset.url;
+              const matchedStream = options.streams.find((s) => s.url === targetUrl);
+              const displayQuality = matchedStream?.isOriginal ? "Original" : (matchedStream?.quality || item.querySelector(".pp-quality-name")?.textContent || "Original").split(" ")[0];
+              if (qualityLabel) qualityLabel.textContent = displayQuality;
+              this.changeSource(targetUrl, true);
               qualityMenu.classList.remove("show");
-              const qName = item.querySelector(".pp-quality-name")?.textContent || item.textContent.trim().split(" ")[0];
-              if (qualityLabel) qualityLabel.textContent = qName.split(" ")[0];
             }
           });
         });

@@ -114,25 +114,31 @@
       }
     }
     let streamUrl = "";
-    const fileName = data.name || "";
+    const target = data.file_info || data;
+    const fileName = target.name || "";
     const fileExt = fileName.includes(".") ? fileName.split(".").pop().toLowerCase() : "";
     const isNonNative = ["avi", "wmv", "flv", "rmvb", "rm", "asf", "divx", "vob", "ts", "m2ts", "3gp"].includes(fileExt) ||
-      /video\/(x-msvideo|avi|msvideo|x-ms-wmv|x-flv)/i.test(data.mime_type || "");
+      /video\/(x-msvideo|avi|msvideo|x-ms-wmv|x-flv)/i.test(target.mime_type || "");
 
-    const origMedia = data.medias?.find((m) => m.media_name === "original" && m.link?.url && !m.link.url.includes("fid=&"));
-    const directUrl = (data.web_content_link && !data.web_content_link.includes("fid=&")) ? data.web_content_link : "";
+    const medias = target.medias || data.medias || [];
+    const origMedia = medias.find((m) => {
+      const name = (m.media_name || m.resolution_name || "").toLowerCase();
+      return (name.includes("original") || name.includes("gốc")) && m.link?.url && !m.link.url.includes("fid=&");
+    });
+    const directUrl = ((target.web_content_link || data.web_content_link) && !(target.web_content_link || data.web_content_link).includes("fid=&"))
+      ? (target.web_content_link || data.web_content_link) : "";
 
     if (!isNonNative) {
-      // Video thông thường: LUÔN ƯU TIÊN Original (file gốc), không bao giờ lấy bản nén 720P/1080P bị lỗi
+      // Video thông thường: CHỈ chấp nhận Original.
+      // Tuyệt đối KHÔNG fallback sang medias[0] (720P/1080P) vì Chrome không hỗ trợ giải mã HLS/transcode trực tiếp!
       streamUrl = origMedia?.link?.url || directUrl;
     } else {
       // File non-native (.avi): thử bản nén MP4 nếu có
-      const transcoded = data.medias?.find((m) => m.media_name !== "original" && m.link?.url && !m.link.url.includes("fid=&"));
+      const transcoded = medias.find((m) => {
+        const name = (m.media_name || m.resolution_name || "").toLowerCase();
+        return !name.includes("original") && !name.includes("gốc") && m.link?.url && !m.link.url.includes("fid=&");
+      });
       streamUrl = transcoded?.link?.url || origMedia?.link?.url || directUrl;
-    }
-
-    if (!streamUrl && data.medias && data.medias[0]?.link?.url) {
-      streamUrl = data.medias[0].link.url;
     }
 
     if (streamUrl) {

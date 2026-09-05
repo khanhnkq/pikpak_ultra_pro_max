@@ -195,7 +195,7 @@
               <!-- Quality Menu (Video Only) -->
               <div class="pp-menu-wrap pp-video-only" id="pp-quality-wrap" style="display: none;">
                 <button id="pp-quality-btn" class="pp-menu-btn" title="Chất lượng">
-                  <span id="pp-quality-label">1080P</span>
+                  <span id="pp-quality-label">Original</span>
                 </button>
                 <div class="pp-dropdown-menu" id="pp-quality-menu"></div>
               </div>

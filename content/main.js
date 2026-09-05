@@ -458,13 +458,6 @@
     try {
       const { shareId, parentId, fileId } = getShareContext();
       const net = window.PikPakNetwork ? window.PikPakNetwork.getIntercepted() : {};
-      if (net.streamUrl) {
-        currentVideo.dataset.ppUnlocked = "true";
-        if (currentPlaylist.length > 0 && currentVideoIndex === -1) currentVideoIndex = 0;
-        updateControls();
-        applyDirectStream(net.streamUrl, { playlist: currentPlaylist, currentIndex: Math.max(0, currentVideoIndex) });
-        return;
-      }
       if (shareId && currentPlaylist.length > 0) {
         currentVideo.dataset.ppUnlocked = "true"; updateControls();
         const targetIdx = currentVideoIndex >= 0 ? currentVideoIndex : 0;
@@ -472,6 +465,12 @@
       } else if (shareId && (fileId || parentId)) {
         currentVideo.dataset.ppUnlocked = "true";
         await loadAndPlayFile(shareId, fileId || parentId);
+      } else if (net.streamUrl) {
+        currentVideo.dataset.ppUnlocked = "true";
+        if (currentPlaylist.length > 0 && currentVideoIndex === -1) currentVideoIndex = 0;
+        updateControls();
+        applyDirectStream(net.streamUrl, { playlist: currentPlaylist, currentIndex: Math.max(0, currentVideoIndex) });
+        return;
       }
     } catch (err) {
       console.warn("[PikPak Ultra] Auto-unlock error:", err.message);
@@ -853,12 +852,15 @@
 
   if (window.PikPakNetwork) {
     window.PikPakNetwork.onStreamUrl((url) => {
-      if (url && !isUnlocked) {
+      const { shareId, parentId, fileId } = getShareContext();
+      if (shareId && (fileId || parentId || currentPlaylist.length > 0)) {
+        checkAndAutoUnlock();
+      } else if (url && !isUnlocked) {
         applyDirectStream(url, {
           playlist: currentPlaylist,
           currentIndex: currentVideoIndex >= 0 ? currentVideoIndex : 0,
         });
-      } else checkAndAutoUnlock();
+      }
     });
     window.PikPakNetwork.onPlaylist((videos) => {
       if (videos?.length > 0) {
