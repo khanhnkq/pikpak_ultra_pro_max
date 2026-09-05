@@ -7,6 +7,7 @@
 
   const BRIDGE_SOURCE_PAGE = "PIKPAK_PAGE_SCRIPT";
   const BRIDGE_SOURCE_EXT = "PIKPAK_INJECTOR_SCRIPT";
+  const BG_VIDEO_SELECTOR = "video:not(#pikpak-ultra-modal-video):not(#pp-scrub-preview-video)";
 
   let pendingRequests = new Map(), currentShareId = null, currentParentId = "";
   let resolvedShareData = null, activeStreamData = null, isUnlocked = false;
@@ -14,6 +15,9 @@
 
   // ====== 1. Communication Bridge ======
   function sendToExtension(action, payload = {}) {
+    if (isContextInvalidated) {
+      return Promise.reject(new Error("Extension context invalidated. Hãy F5 tải lại trang!"));
+    }
     return new Promise((resolve, reject) => {
       const requestId = "req_" + Math.random().toString(36).substring(2, 9) + "_" + Date.now();
       pendingRequests.set(requestId, { resolve, reject, action });
@@ -75,7 +79,10 @@
   function suppressModals() {
     if (!isUnlocked) return;
     document.querySelectorAll('[class*="preview"],[class*="limit"],[class*="countdown"],[class*="save-dialog"],[class*="vip-modal"],[class*="modal-mask"]').forEach((el) => {
-      if (/Previewing remaining|Preview remaining|00:30|Save Now|Save to Drive/.test(el.innerText || "")) { el.style.display = "none"; el.style.pointerEvents = "none"; }
+      if (/Previewing remaining|Preview remaining|00:30|Save Now|Save to Drive/.test(el.textContent || "")) {
+        el.style.display = "none";
+        el.style.pointerEvents = "none";
+      }
     });
   }
 
@@ -87,6 +94,7 @@
   }
 
   function renderDurationBadgesOnWeb() {
+    if (window.PikPakPlayer?.isModalOpen) return;
     const items = document.querySelectorAll('.file-item, .grid.file-item, .file-list-item, .el-table__row');
     if (items.length === 0) return;
 
@@ -98,12 +106,20 @@
     const icons = window.PikPakIcons || {};
 
     items.forEach((itemEl) => {
+      if (itemEl.dataset.ppProcessed === "1") return;
+
       const thumb = itemEl.querySelector('.thumbnail') || itemEl.querySelector('.file-cover, .thumbnail-wrap, .player-file-cover');
       if (!thumb) return;
 
       const hasDuration = Boolean(thumb.querySelector('.pp-web-duration-badge'));
       const hasTypeBadge = Boolean(thumb.querySelector('.pp-type-badge'));
-      if (hasDuration && hasTypeBadge) return;
+      const fc = thumb.querySelector('.folder-cover');
+      const hasFolderBlur = fc ? Boolean(fc.querySelector('.pp-folder-blur')) : true;
+
+      if (hasDuration && hasTypeBadge && hasFolderBlur) {
+        itemEl.dataset.ppProcessed = "1";
+        return;
+      }
 
       let durationStr = "", vItem = null;
       try {
@@ -114,7 +130,7 @@
       } catch (_) {}
 
       const nameEl = itemEl.querySelector('.name .ellipsis, .name, [class*="file-name"], [class*="title"]');
-      const rawName = (nameEl?.textContent || itemEl.querySelector('img')?.alt || itemEl.innerText || '').trim().split('\n')[0].trim().toLowerCase();
+      const rawName = (nameEl?.textContent || itemEl.querySelector('img')?.alt || itemEl.textContent || '').trim().split('\n')[0].trim().toLowerCase();
 
       if (!durationStr && currentPlaylist?.length > 0) {
         const matched = currentPlaylist.find((v) => v?.name && (rawName.includes(v.name.toLowerCase()) || v.name.toLowerCase().includes(rawName)));
@@ -122,42 +138,66 @@
       }
 
       if (durationStr && !hasDuration) {
-        const badge = document.createElement('span'); badge.className = 'pp-web-duration-badge'; badge.textContent = durationStr; thumb.appendChild(badge);
+        const badge = document.createElement('span');
+        badge.className = 'pp-web-duration-badge';
+        badge.textContent = durationStr;
+        thumb.appendChild(badge);
       }
       if (!hasTypeBadge) {
         let type = '';
-        if (itemEl.querySelector('.folder-cover') || itemEl.classList.contains('is-folder') || vItem?.kind === 'drive#folder') type = 'folder';
+        if (fc || itemEl.classList.contains('is-folder') || vItem?.kind === 'drive#folder') type = 'folder';
         else if (durationStr || itemEl.querySelector('.play-icon') || vItem?.kind === 'drive#video' || /\.(mp4|mkv|avi|mov|wmv|flv|webm|ts|m4v|3gp|rmvb|iso)$/i.test(rawName)) type = 'video';
         else if (vItem?.kind === 'drive#image' || /\.(jpg|jpeg|png|webp|gif|bmp|svg|tiff|avif|heic)$/i.test(rawName)) type = 'image';
         if (type && icons[type]) {
-          const tb = document.createElement('span'); tb.className = `pp-type-badge pp-type-${type}`;
+          const tb = document.createElement('span');
+          tb.className = `pp-type-badge pp-type-${type}`;
           tb.title = type === 'folder' ? 'Thư mục' : type === 'video' ? 'Video' : 'Hình ảnh';
-          tb.innerHTML = icons[type]; thumb.appendChild(tb);
+          tb.innerHTML = icons[type];
+          thumb.appendChild(tb);
         }
       }
-      const fc = thumb.querySelector('.folder-cover');
-      const fImg = fc && !fc.querySelector('.pp-folder-blur') ? fc.querySelector('img') : null;
-      if (fImg?.src) {
-        const b = document.createElement('div'); b.className = 'pp-folder-blur'; b.style.backgroundImage = `url("${fImg.src}")`; fc.prepend(b);
+      if (fc && !fc.querySelector('.pp-folder-blur')) {
+        const fImg = fc.querySelector('img');
+        if (fImg?.src) {
+          const b = document.createElement('div');
+          b.className = 'pp-folder-blur';
+          b.style.backgroundImage = `url("${fImg.src}")`;
+          fc.prepend(b);
+        }
       }
+
+      itemEl.dataset.ppProcessed = "1";
     });
   }
 
   function harvestPikPakThumbnails() {
+    if (window.PikPakPlayer?.isModalOpen) return;
     document.querySelectorAll("#manager-preview-bar .player-file-cover, .file-list-box .file-list-item").forEach((el, idx) => {
       const src = el.querySelector("img")?.src;
       if (src && currentPlaylist[idx] && (!currentPlaylist[idx].thumbnailLink || currentPlaylist[idx].thumbnailLink.length < 5)) currentPlaylist[idx].thumbnailLink = src;
     });
   }
 
-  const modalObserver = new MutationObserver(() => {
-    suppressModals(); harvestPikPakThumbnails(); renderDurationBadgesOnWeb();
-    if (window.PikPakPlayer?.isModalOpen) {
-      document.querySelectorAll("video:not(#pikpak-ultra-modal-video)").forEach((v) => {
+  let observerThrottleTimer = null;
+  function handleDomMutations() {
+    suppressModals();
+    if (!window.PikPakPlayer?.isModalOpen) {
+      harvestPikPakThumbnails();
+      renderDurationBadgesOnWeb();
+      checkAndAutoUnlock();
+    } else {
+      document.querySelectorAll(BG_VIDEO_SELECTOR).forEach((v) => {
         try { if (!v.paused) v.pause(); v.muted = true; v.volume = 0; } catch (_) {}
       });
     }
-    checkAndAutoUnlock();
+  }
+
+  const modalObserver = new MutationObserver(() => {
+    if (observerThrottleTimer) return;
+    observerThrottleTimer = setTimeout(() => {
+      observerThrottleTimer = null;
+      handleDomMutations();
+    }, 150);
   });
   modalObserver.observe(document.documentElement, { childList: true, subtree: true });
 
@@ -237,8 +277,9 @@
 
   // ====== 8. Auto-Unlock Watcher ======
   async function checkAndAutoUnlock() {
-    const currentVideo = document.querySelector("video:not(#pikpak-ultra-modal-video)");
-    if (!currentVideo || currentVideo.dataset.ppUnlocked === "true" || currentVideo.dataset.ppUnlocked === "failed" || window.PikPakPlayer?.isModalOpen || isAutoUnlocking) return;
+    if (window.PikPakPlayer?.isModalOpen || isAutoUnlocking) return;
+    const currentVideo = document.querySelector(BG_VIDEO_SELECTOR);
+    if (!currentVideo || currentVideo.dataset.ppUnlocked === "true" || currentVideo.dataset.ppUnlocked === "failed") return;
     isAutoUnlocking = true;
 
     const attempts = parseInt(currentVideo.dataset.ppAttempts || "0", 10) + 1;
@@ -273,11 +314,15 @@
   }
 
   function applyDirectStream(url, meta = {}) {
+    if (!url) return;
+    if (window.PikPakPlayer?.isModalOpen && window.PikPakPlayer?.currentStreamUrl === url) {
+      return;
+    }
     isUnlocked = true;
     console.log("%c[PikPak Ultra] 📺 Khởi chạy Cinema Modal Player:", LOG_SUCCESS, { url, meta });
 
     // Dập tắt triệt để video gốc ở nền
-    document.querySelectorAll("video:not(#pikpak-ultra-modal-video)").forEach((v) => {
+    document.querySelectorAll(BG_VIDEO_SELECTOR).forEach((v) => {
       try { v.pause(); v.muted = true; v.volume = 0; v.style.display = "none"; v.onplay = () => { if (window.PikPakPlayer?.isModalOpen) { v.pause(); v.muted = true; v.volume = 0; } }; } catch (_) {}
     });
 
@@ -290,11 +335,19 @@
       onDownload: () => handleDownloadClick(),
       onRefreshRequest: () => {
         if (currentShareId && activeStreamData?.fileId) {
-          sendToExtension("REFRESH_STREAM_URL", { shareId: currentShareId, fileId: activeStreamData.fileId }).then((newData) => {
-            activeStreamData = newData;
-            window.PikPakPlayer.changeSource(newData.primaryUrl);
-            showToast("Đã cập nhật link stream mới!");
-          });
+          sendToExtension("REFRESH_STREAM_URL", { shareId: currentShareId, fileId: activeStreamData.fileId })
+            .then((newData) => {
+              if (newData && newData.primaryUrl) {
+                activeStreamData = newData;
+                window.PikPakPlayer.changeSource(newData.primaryUrl);
+                showToast("Đã cập nhật link stream mới!");
+              } else {
+                console.warn("[PikPak Ultra] Refresh stream returned empty primaryUrl");
+              }
+            })
+            .catch((err) => {
+              console.warn("[PikPak Ultra] Error refreshing stream URL:", err.message);
+            });
         }
       },
     });
@@ -328,7 +381,7 @@
     } catch (_) {}
     if (vItem?.kind === "drive#folder") return;
 
-    const itemText = (itemEl.innerText || "").trim();
+    const itemText = (itemEl.textContent || "").trim();
     const isVideoExt = /\.(mp4|mkv|avi|mov|wmv|flv|webm|ts|m4v|3gp|rmvb|iso)/i.test(itemText);
     const isImageExt = /\.(jpe?g|png|webp|gif|bmp|svg|avif|heic|tiff)/i.test(itemText);
     const hasPlayIcon = Boolean(itemEl.querySelector(".play-icon, [class*='play-icon']"));
@@ -437,16 +490,28 @@
   }
 
   // ====== 9. Polling for DOM changes / SPA Navigation ======
+  let lastCheckedHref = window.location.href;
   setInterval(() => {
     if (isContextInvalidated) return;
-    checkAndAutoUnlock();
+    if (!window.PikPakPlayer?.isModalOpen) {
+      checkAndAutoUnlock();
+    }
+
+    const currentHref = window.location.href;
+    const hrefChanged = currentHref !== lastCheckedHref;
+    if (hrefChanged) {
+      lastCheckedHref = currentHref;
+      document.querySelectorAll('[data-pp-processed]').forEach((el) => {
+        delete el.dataset.ppProcessed;
+      });
+    }
 
     const { shareId, parentId, fileId } = getShareContext();
     const targetId = fileId || parentId;
 
     if (currentPlaylist.length > 0 && targetId && currentPlaylist.some((v) => v.id === targetId)) {
       const matchedIdx = currentPlaylist.findIndex((v) => v.id === targetId);
-      if (matchedIdx !== -1 && matchedIdx !== currentVideoIndex) {
+      if (matchedIdx !== -1 && matchedIdx !== currentVideoIndex && !window.PikPakPlayer?.isModalOpen) {
         currentParentId = parentId;
         playMediaByIndex(matchedIdx);
       }

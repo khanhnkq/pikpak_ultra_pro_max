@@ -110,7 +110,11 @@
         } catch (_) {}
       }
 
-      if (url.includes("/drive/") || url.includes("/file/") || url.includes("mypikpak")) {
+      const contentType = response.headers.get("content-type") || "";
+      const isJson = contentType.includes("application/json") || contentType.includes("text/json");
+      const isApiEndpoint = url.includes("/drive/v1/") || url.includes("/drive/") || (url.includes("mypikpak") && !url.includes(".ts") && !url.includes(".m3u8") && !url.includes(".mp4"));
+
+      if (isJson && isApiEndpoint) {
         const clone = response.clone();
         clone.json().then((data) => processResponseData(data)).catch(() => {});
       }
@@ -130,7 +134,8 @@
   XMLHttpRequest.prototype.send = function (...args) {
     this.addEventListener("load", function () {
       try {
-        if (this._ppUrl && (this._ppUrl.includes("/drive/") || this._ppUrl.includes("mypikpak"))) {
+        const ct = this.getResponseHeader ? (this.getResponseHeader("content-type") || "") : "";
+        if (this._ppUrl && (this._ppUrl.includes("/drive/") || this._ppUrl.includes("mypikpak")) && (!ct || ct.includes("json"))) {
           const data = JSON.parse(this.responseText);
           processResponseData(data);
         }

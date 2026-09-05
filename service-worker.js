@@ -101,8 +101,28 @@ async function handleGetStreamUrl({ shareId, fileId }) {
 async function handleRefreshStreamUrl({ shareId, fileId }) {
   console.log(`[ServiceWorker] 🔄 REFRESH_STREAM_URL: shareId=${shareId}, fileId=${fileId}`);
   if (!shareId || !fileId) throw new Error("Missing shareId or fileId");
-  client.cache.delete(`${shareId}:${fileId}`);
-  return client.resolveMediaStreams(shareId, fileId);
+  const cacheKey = `${shareId}:${fileId}`;
+  const previousCached = client.cache.get(cacheKey);
+  client.cache.delete(cacheKey);
+  try {
+    const refreshed = await client.resolveMediaStreams(shareId, fileId);
+    if (refreshed?.primaryUrl) {
+      return refreshed;
+    }
+    if (previousCached?.data?.primaryUrl) {
+      console.warn(`[ServiceWorker] ⚠️ Refreshed stream had no primaryUrl, falling back to previous cache`);
+      client.cache.set(cacheKey, previousCached);
+      return previousCached.data;
+    }
+    return refreshed;
+  } catch (err) {
+    if (previousCached?.data?.primaryUrl) {
+      console.warn(`[ServiceWorker] ⚠️ Refresh error (${err.message}), falling back to previous cache`);
+      client.cache.set(cacheKey, previousCached);
+      return previousCached.data;
+    }
+    throw err;
+  }
 }
 
 function updateBadge(tabId, text, color) {

@@ -3,6 +3,8 @@
  */
 
 (function (root) {
+  const BG_VIDEO_SELECTOR = "video:not(#pikpak-ultra-modal-video):not(#pp-scrub-preview-video)";
+
   function formatTime(s) {
     s = Math.floor(isNaN(s) || s < 0 ? 0 : s);
     const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
@@ -242,9 +244,15 @@
       v.addEventListener("ended", () => this.navigationHandlers?.onNext?.());
       let retryCount = 0, lastErrorTime = 0;
       v.addEventListener("error", () => {
-        const now = Date.now(); if (now - lastErrorTime < 4000) return;
+        if (!v.error || v.error.code === 1 || !v.src || !this.isModalOpen) return;
+        const now = Date.now(); if (now - lastErrorTime < 5000) return;
         lastErrorTime = now;
-        if (retryCount < 2 && this.refreshCallback) { retryCount++; this.refreshCallback(); }
+        console.warn(`[PikPak Cinema] Video error (code ${v.error.code}, message: ${v.error.message || "none"})`);
+        if (retryCount < 2 && this.refreshCallback) {
+          retryCount++;
+          console.log(`[PikPak Cinema] Attempting stream refresh (retry ${retryCount}/2)...`);
+          this.refreshCallback();
+        }
       });
       v.addEventListener("loadedmetadata", () => this.updateProgress());
       v.addEventListener("playing", () => this.updatePlayPauseUI());
@@ -255,7 +263,7 @@
       this.navigationHandlers = navigationHandlers;
       (document.body || document.documentElement).classList.add("pp-cinema-active");
 
-      document.querySelectorAll("video:not(#pikpak-ultra-modal-video)").forEach((v) => {
+      document.querySelectorAll(BG_VIDEO_SELECTOR).forEach((v) => {
         try { v.pause(); v.muted = true; v.volume = 0; v.style.display = "none"; } catch (_) {}
       });
 
@@ -397,7 +405,7 @@
       // Tối ưu hiệu năng: Dập tắt triệt để video gốc ở nền
       // Exclude pp-scrub-preview-video so the seek preview keeps working
       (document.body || document.documentElement).classList.add("pp-cinema-active");
-      document.querySelectorAll("video:not(#pikpak-ultra-modal-video):not(#pp-scrub-preview-video)").forEach((v) => {
+      document.querySelectorAll(BG_VIDEO_SELECTOR).forEach((v) => {
         try {
           v.pause();
           v.muted = true;
@@ -407,11 +415,11 @@
       });
 
       // Mount stream to modal video
-      this.modalVideo.pause();
-      this.modalVideo.removeAttribute("src");
-      this.modalVideo.src = streamUrl;
-      this.modalVideo.currentTime = 0;
-      this.modalVideo.load();
+      if (this.modalVideo.src !== streamUrl) {
+        this.modalVideo.src = streamUrl;
+        this.modalVideo.currentTime = 0;
+        this.modalVideo.load();
+      }
       this.preview?.setSource(streamUrl);
 
       this.modalContainer.classList.add("active");
@@ -427,8 +435,16 @@
           .catch((err) => {
             console.warn("[PikPak Cinema] Muted fallback autoplay:", err.message);
             this.modalVideo.muted = true;
-            this.modalVideo.play().catch(() => {});
             this.updateVolumeUI();
+            this.modalVideo.play()
+              .then(() => {
+                console.log("[PikPak Cinema] ▶️ Video phát ở chế độ tắt tiếng!");
+                this.updatePlayPauseUI();
+              })
+              .catch((e) => {
+                console.warn("[PikPak Cinema] Autoplay blocked completely:", e.message);
+                this.updatePlayPauseUI();
+              });
           });
       }
 
@@ -438,9 +454,14 @@
 
     closeCinemaModal() {
       if (!this.modalContainer) return;
+      clearTimeout(this.idleTimeout);
+      this.idleTimeout = null;
       this.modalContainer.classList.remove("active");
       this.isModalOpen = false;
       this.isImageMode = false;
+      this.isDraggingProgress = false;
+      this.isHoveringProgress = false;
+      this.preview?.hide();
       this.imageViewer?.destroy();
       const c = document.getElementById("pp-player-container");
       if (c) c.classList.remove("is-image-mode", "is-video-mode");
@@ -457,22 +478,41 @@
 
       this.currentStreamUrl = null;
       this.drawer.toggle(false);
-      document.querySelectorAll("video:not(#pikpak-ultra-modal-video):not(#pp-scrub-preview-video)").forEach((v) => {
+      document.querySelectorAll(BG_VIDEO_SELECTOR).forEach((v) => {
         try { v.style.display = ""; v.muted = false; } catch (_) {}
       });
       console.log("[PikPak Ultra] Cinema Modal Player đã đóng.");
     }
 
     changeSource(newUrl, isUser = false) {
-      if (!this.modalVideo) return;
+      if (!this.modalVideo || !newUrl) return;
+      if (this.currentStreamUrl === newUrl) return;
       const curTime = this.modalVideo.currentTime || 0;
+      const wasPlaying = !this.modalVideo.paused;
       this.currentStreamUrl = newUrl;
       this.modalVideo.src = newUrl;
-      this.modalVideo.currentTime = curTime;
       this.modalVideo.load();
       this.preview?.setSource(newUrl);
-      this.modalVideo.play().catch(() => {});
-      if (isUser) this.shortcuts.showHud("Đổi độ phân giải", null);
+
+      const onMetadata = () => {
+        this.modalVideo.removeEventListener("loadedmetadata", onMetadata);
+        if (curTime > 0) {
+          try { this.modalVideo.currentTime = curTime; } catch (_) {}
+        }
+        if (wasPlaying || isUser) {
+          this.modalVideo.play().then(() => {
+            this.updatePlayPauseUI();
+          }).catch(() => {
+            this.modalVideo.muted = true;
+            this.updateVolumeUI();
+            this.modalVideo.play().catch(() => {});
+            this.updatePlayPauseUI();
+          });
+        }
+      };
+      this.modalVideo.addEventListener("loadedmetadata", onMetadata);
+
+      if (isUser) this.shortcuts?.showHud("Đổi độ phân giải", null);
     }
   }
 

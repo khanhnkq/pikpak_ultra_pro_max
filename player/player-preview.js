@@ -62,17 +62,9 @@
       this.isSeeking = false;
       this.pendingTime = null;
       this.currentStreamUrl = streamUrl;
+      this.previewVideo.muted = true;
       this.previewVideo.src = streamUrl;
       this.previewVideo.load();
-      // Browser won't buffer until play() is called.
-      // play().then(pause()) primes the decoder so seek works without playing.
-      this.previewVideo.play().then(() => {
-        this.previewVideo.pause();
-      }).catch(() => {
-        // Autoplay blocked — try muted
-        this.previewVideo.muted = true;
-        this.previewVideo.play().then(() => this.previewVideo.pause()).catch(() => {});
-      });
     }
 
     _doSeek(time) {
