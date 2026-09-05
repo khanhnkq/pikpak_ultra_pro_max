@@ -21,6 +21,10 @@
       this.refreshCallback = null;
       this.navigationHandlers = null;
       this.isModalOpen = false;
+      this.isSwitchingSource = false;
+      this.isRefreshingStream = false;
+      this.streamRefreshCount = 0;
+      this.streamLoadTimeout = null;
       this.hasPushedHistoryState = false;
 
       // State
@@ -364,18 +368,57 @@
       document.getElementById("pp-ctrl-fullscreen")?.addEventListener("click", () => this.toggleFullscreen());
 
       // Video lifecycle
-      v.addEventListener("ended", () => this.navigationHandlers?.onNext?.());
+      v.addEventListener("ended", () => {
+        if (this.isSwitchingSource) return;
+        this.navigationHandlers?.onNext?.();
+      });
       let retryCount = 0, lastErrorTime = 0;
       v.addEventListener("error", () => {
-        if (!v.error || v.error.code === 1 || !this.isModalOpen) return;
+        if (!v.error || v.error.code === 1 || !this.isModalOpen || this.isSwitchingSource) return;
         const now = Date.now(); if (now - lastErrorTime < 2000) return;
         lastErrorTime = now;
         console.warn(`[PikPak Cinema] Video error (code ${v.error.code}, message: ${v.error.message || "none"})`);
 
-        // Tự động tải lại luồng hiện tại nếu gặp gián đoạn tạm thời
-        if (retryCount < 2 && this.currentStreamUrl) {
+        if (!this.failedStreamUrls) this.failedStreamUrls = new Set();
+        if (v.src) this.failedStreamUrls.add(v.src);
+        if (this.currentStreamUrl) this.failedStreamUrls.add(this.currentStreamUrl);
+
+        // If the faster transcoded CDN fails, immediately try the original
+        // file from the same personal Cloud item before refreshing the CDN.
+        if (this.tryOriginalFallback()) return;
+
+        // A CDN URL can expire or reject a seek Range (HTTP 416). Ask the
+        // caller for a fresh personal-cloud URL before retrying the same URL.
+        if (this.refreshCallback && !this.isRefreshingStream) {
+          this.isRefreshingStream = true;
+          const savePos = v.currentTime || 0;
+          const wasPlaying = !v.paused;
+          this.setLoadingMessage("CDN tạm thời không nhận vị trí tua, đang làm mới link...");
+          Promise.resolve(this.refreshCallback({ currentTime: savePos }))
+            .then((result) => {
+              if (!result?.url || !this.isModalOpen) throw new Error("CDN mới không hợp lệ");
+              if (result.streams?.length) {
+                this.currentOptions = { ...this.currentOptions, streams: result.streams };
+              }
+              if (result.fileSize) this.currentOptions.fileSize = result.fileSize;
+              retryCount = 0;
+              this.currentStreamUrl = null;
+              this.changeSource(result.url, false, wasPlaying);
+            })
+            .catch((refreshError) => {
+              console.warn("[PikPak Cinema] Không thể làm mới CDN:", refreshError.message);
+              this.showPlaybackErrorUI(v.error);
+            })
+            .finally(() => {
+              this.isRefreshingStream = false;
+            });
+          return;
+        }
+
+        // Fallback: retry the same URL once for transient decoder/network errors.
+        if (retryCount < 1 && this.currentStreamUrl) {
           retryCount++;
-          console.log(`[PikPak Cinema] 🔄 Đang tự động kết nối lại luồng video (${retryCount}/2)...`);
+          console.log(`[PikPak Cinema] 🔄 Đang tự động kết nối lại luồng video (${retryCount}/1)...`);
           const savePos = v.currentTime || 0;
           v.src = this.currentStreamUrl;
           v.load();
@@ -392,17 +435,6 @@
           return;
         }
 
-        if (!this.failedStreamUrls) this.failedStreamUrls = new Set();
-        if (v.src) this.failedStreamUrls.add(v.src);
-        if (this.currentStreamUrl) this.failedStreamUrls.add(this.currentStreamUrl);
-
-        // Nếu có callback refresh token, yêu cầu background làm mới link trước khi từ bỏ
-        if (this.refreshCallback) {
-          console.log("[PikPak Cinema] Yêu cầu cấp mới token stream từ PikPak API...");
-          this.refreshCallback();
-          return;
-        }
-
         // Display user-friendly recovery UI
         this.showPlaybackErrorUI(v.error);
       });
@@ -411,15 +443,91 @@
         this.updateProgress();
       });
       v.addEventListener("playing", () => {
+        clearTimeout(this.streamLoadTimeout);
+        this.streamLoadTimeout = null;
+        this.streamRefreshCount = 0;
         this.hidePlaybackErrorUI();
+        this.hideLoading();
         this.updatePlayPauseUI();
       });
+    }
+
+    setLoadingMessage(message = "Đang nạp luồng phát...") {
+      const spinner = document.getElementById("pp-cinema-spinner");
+      const spinnerText = document.getElementById("pp-spinner-text");
+      if (spinnerText) spinnerText.textContent = message;
+      if (spinner) spinner.classList.add("show");
+    }
+
+    hideLoading() {
+      document.getElementById("pp-cinema-spinner")?.classList.remove("show");
+    }
+
+    async refreshCurrentStream(reason = "CDN cần làm mới") {
+      if (!this.refreshCallback || this.isRefreshingStream || !this.isModalOpen || !this.modalVideo) return false;
+      if (this.streamRefreshCount >= 2) {
+        this.showPlaybackErrorUI(this.modalVideo.error);
+        return false;
+      }
+
+      this.isRefreshingStream = true;
+      this.streamRefreshCount++;
+      const video = this.modalVideo;
+      const savePos = video.currentTime || 0;
+      const wasPlaying = !video.paused;
+      this.setLoadingMessage(`${reason}, đang lấy CDN mới...`);
+
+      try {
+        const result = await this.refreshCallback({ currentTime: savePos, reason });
+        if (!result?.url) throw new Error("CDN mới không hợp lệ");
+        if (result.streams?.length) {
+          this.currentOptions = { ...this.currentOptions, streams: result.streams };
+        }
+        if (result.fileSize) this.currentOptions.fileSize = result.fileSize;
+        this.currentStreamUrl = null;
+        this.changeSource(result.url, false, wasPlaying);
+        return true;
+      } catch (error) {
+        console.warn("[PikPak Cinema] Không thể làm mới CDN:", error.message);
+        this.showPlaybackErrorUI(video.error);
+        return false;
+      } finally {
+        this.isRefreshingStream = false;
+      }
+    }
+
+    tryOriginalFallback() {
+      const failedUrls = this.failedStreamUrls || new Set();
+      const original = this.currentOptions?.streams?.find((stream) =>
+        stream?.isOriginal && stream.url && !stream.url.includes("fid=&") && !failedUrls.has(stream.url)
+      );
+      if (!original?.url || original.url === this.currentStreamUrl) return false;
+
+      console.warn("[PikPak Cinema] ⚠️ CDN không phát được, chuyển sang Origin:", original.url);
+      this.currentStreamUrl = null;
+      this.changeSource(original.url, false, true);
+      return true;
     }
 
     showInstantLoading(title, index = 0, playlist = [], navigationHandlers = {}) {
       this.ensureModalDom();
       this.navigationHandlers = navigationHandlers;
+      this.isSwitchingSource = true;
+      this.isRefreshingStream = false;
+      this.streamRefreshCount = 0;
+      this.currentStreamUrl = null;
+      this.refreshCallback = null;
       (document.body || document.documentElement).classList.add("pp-cinema-active");
+
+      this.hidePlaybackErrorUI();
+      this.bufferManager?.stop();
+      this.preview?.hide();
+      if (this.modalVideo) {
+        this.modalVideo.pause();
+        this.modalVideo.removeAttribute("src");
+        this.modalVideo.src = "";
+        this.modalVideo.load();
+      }
 
       this.purgeUnusedMediaAndLayers();
 
@@ -450,10 +558,12 @@
       this.pushHistoryState();
       this.modalContainer.classList.add("active");
       this.isModalOpen = true;
+      this.resetIdleTimer();
     }
 
     openImageModal(imageUrl, options = {}) {
       this.ensureModalDom();
+      this.isSwitchingSource = false;
       this.isImageMode = true;
       this.purgeUnusedMediaAndLayers();
       this.onDownloadHandler = options.onDownload || null;
@@ -501,6 +611,9 @@
 
     openCinemaModal(streamUrl, options = {}) {
       this.ensureModalDom();
+      this.isSwitchingSource = false;
+      this.isRefreshingStream = false;
+      this.streamRefreshCount = 0;
       this.isImageMode = false;
       this.failedStreamUrls = new Set();
       this.hidePlaybackErrorUI();
@@ -533,11 +646,13 @@
             effectiveStreamUrl = transcoded.url;
           }
         } else {
-          // Video thông thường: LUÔN BẮT BUỘC CHỌN BẢN GỐC (Original) để đảm bảo 100% phát mượt mà
+          // Stream transcoded thường seek nhanh hơn bản Original nhiều GB.
+          const transcoded = options.streams.find((s) => !s.isOriginal && s.url && !s.url.includes("fid=&"));
           const origStream = options.streams.find((s) => s.isOriginal && s.url && !s.url.includes("fid=&"));
-          if (origStream && origStream.url) {
-            console.log(`[PikPak Cinema] 🎬 Video chuẩn: Khởi chạy với luồng Original (${origStream.quality}):`, origStream.url);
-            effectiveStreamUrl = origStream.url;
+          if (transcoded?.url || origStream?.url) {
+            const selected = transcoded || origStream;
+            console.log(`[PikPak Cinema] 🎬 Video chuẩn: Khởi chạy với luồng ${transcoded ? "Transcoded" : "Original"} (${selected.quality || "Auto"}):`, selected.url);
+            effectiveStreamUrl = selected.url;
           }
         }
       }
@@ -545,6 +660,7 @@
       this.currentStreamUrl = effectiveStreamUrl;
       this.currentOptions = options;
       this.refreshCallback = options.onRefreshRequest || null;
+      this.setLoadingMessage(`Đang nạp: ${fileName || "video"}`);
 
       // Update top info
       const topInfo = document.getElementById("pp-modal-top-info");
@@ -683,10 +799,6 @@
         }
       }
 
-      // Hide spinner
-      const spinner = document.getElementById("pp-cinema-spinner");
-      if (spinner) spinner.classList.remove("show");
-
       // Tối ưu hiệu năng: Xóa sổ triệt để video gốc và các layer thừa ở nền
       (document.body || document.documentElement).classList.add("pp-cinema-active");
       this.purgeUnusedMediaAndLayers();
@@ -707,7 +819,10 @@
       this.shortcuts?.clearPendingBackTimer?.();
       clearTimeout(this.idleTimeout);
       this.idleTimeout = null;
+      clearTimeout(this.streamLoadTimeout);
+      this.streamLoadTimeout = null;
       this.revertHistoryState(shouldRevertHistory);
+      this.isSwitchingSource = false;
       this.hidePlaybackErrorUI();
       this.modalContainer.classList.remove("active");
       this.isModalOpen = false;
@@ -746,7 +861,7 @@
       console.log("[PikPak Ultra] Cinema Modal Player đã đóng, tài nguyên đã giải phóng.");
     }
 
-    changeSource(newUrl, isUser = false) {
+    changeSource(newUrl, isUser = false, forceAutoplay = false) {
       if (!this.modalVideo || !newUrl) return;
       if (this.currentStreamUrl === newUrl) return;
       this.hidePlaybackErrorUI();
@@ -756,6 +871,7 @@
 
       // Update quality dropdown UI
       const matched = this.currentOptions?.streams?.find((s) => s.url === newUrl);
+      this.setLoadingMessage(`Đang đổi luồng: ${matched?.quality || "Original"}`);
       if (matched) {
         const qualityLabel = document.getElementById("pp-quality-label");
         if (qualityLabel) qualityLabel.textContent = matched.isOriginal ? "Original" : (matched.quality || "Original").split(" ")[0];
@@ -766,7 +882,7 @@
 
       this.preview?.setSource(newUrl);
       this.bufferManager?.start(newUrl, this.currentOptions);
-      this.mountStreamSource(newUrl, curTime, wasPlaying || isUser);
+      this.mountStreamSource(newUrl, curTime, wasPlaying || isUser || forceAutoplay);
 
       if (isUser) this.shortcuts?.showHud("Đổi độ phân giải", null);
     }
@@ -779,6 +895,14 @@
       console.log(`[PikPak Cinema] 🎬 Video: Nạp luồng ${isOriginal ? "Original (Bản gốc)" : (matched?.quality || "Transcode")}:`, url);
 
       this.currentStreamUrl = url;
+      clearTimeout(this.streamLoadTimeout);
+      this.streamLoadTimeout = setTimeout(() => {
+        if (this.isModalOpen && this.currentStreamUrl === url && this.modalVideo.readyState < 3 && !this.isRefreshingStream) {
+          if (!this.failedStreamUrls) this.failedStreamUrls = new Set();
+          this.failedStreamUrls.add(url);
+          if (!this.tryOriginalFallback()) this.refreshCurrentStream("CDN tải quá lâu");
+        }
+      }, 15000);
 
       // Nạp trực tiếp 100% bằng Native HTML5 Video Engine (GPU Hardware Acceleration)
       // KHÔNG gán currentTime = 0 trước khi load() vì sẽ gây HTTP Range abort / lỗi 416

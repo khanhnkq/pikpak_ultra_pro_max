@@ -1,26 +1,15 @@
 /**
  * PikPak Ultra Pro Max - Network Traffic Interceptor
- * Single Responsibility: Hooks fetch & XMLHttpRequest to intercept share metadata & stream URLs
+ * Single Responsibility: Hooks fetch & XMLHttpRequest to intercept share metadata
  */
 
 (function (root) {
   const LOG_STYLE = "color: #38bdf8; font-weight: bold; background: #0b1528; padding: 2px 6px; border-radius: 4px;";
-  const LOG_SUCCESS = "color: #4ade80; font-weight: bold; background: #0b2815; padding: 2px 6px; border-radius: 4px;";
-
   let autoInterceptedShareId = null;
   let autoInterceptedParentId = null;
   let autoInterceptedFileId = null;
-  let autoInterceptedUrl = null;
   let autoInterceptedPlaylist = [];
-  const streamCallbacks = [];
   const playlistCallbacks = [];
-
-  function notifyStreamUrl(url) {
-    autoInterceptedUrl = url;
-    streamCallbacks.forEach((cb) => {
-      try { cb(url); } catch (_) {}
-    });
-  }
 
   function formatDuration(sec) {
     const s = parseInt(sec, 10);
@@ -80,11 +69,16 @@
 
   function processResponseData(data) {
     if (!data) return;
+    if (data.pass_code_token) {
+      autoInterceptedPassCodeToken = data.pass_code_token;
+    }
+    if (data.captcha_token) {
+      autoInterceptedCaptchaToken = data.captcha_token;
+    }
     if (data.file_info?.id) {
       autoInterceptedFileId = data.file_info.id;
     }
     if (data.files && Array.isArray(data.files)) {
-      data.files.sort(compareMediaItems);
       const mediaList = [];
       data.files.forEach((item) => {
         if (item && item.kind !== "drive#folder") {
@@ -113,54 +107,78 @@
         notifyPlaylist(mediaList);
       }
     }
-    let streamUrl = "";
-    const target = data.file_info || data;
-    const fileName = target.name || "";
-    const fileExt = fileName.includes(".") ? fileName.split(".").pop().toLowerCase() : "";
-    const isNonNative = ["avi", "wmv", "flv", "rmvb", "rm", "asf", "divx", "vob", "ts", "m2ts", "3gp"].includes(fileExt) ||
-      /video\/(x-msvideo|avi|msvideo|x-ms-wmv|x-flv)/i.test(target.mime_type || "");
-
-    const medias = target.medias || data.medias || [];
-    const origMedia = medias.find((m) => {
-      const name = (m.media_name || m.resolution_name || "").toLowerCase();
-      return (name.includes("original") || name.includes("gốc")) && m.link?.url && !m.link.url.includes("fid=&");
-    });
-    const directUrl = ((target.web_content_link || data.web_content_link) && !(target.web_content_link || data.web_content_link).includes("fid=&"))
-      ? (target.web_content_link || data.web_content_link) : "";
-
-    if (!isNonNative) {
-      // Video thông thường: CHỈ chấp nhận Original.
-      // Tuyệt đối KHÔNG fallback sang medias[0] (720P/1080P) vì Chrome không hỗ trợ giải mã HLS/transcode trực tiếp!
-      streamUrl = origMedia?.link?.url || directUrl;
-    } else {
-      // File non-native (.avi): thử bản nén MP4 nếu có
-      const transcoded = medias.find((m) => {
-        const name = (m.media_name || m.resolution_name || "").toLowerCase();
-        return !name.includes("original") && !name.includes("gốc") && m.link?.url && !m.link.url.includes("fid=&");
-      });
-      streamUrl = transcoded?.link?.url || origMedia?.link?.url || directUrl;
-    }
-
-    if (streamUrl) {
-      notifyStreamUrl(streamUrl);
-    }
   }
 
   function isRelevantEndpoint(url) {
-    if (!url) return false;
-    return (
-      url.includes("/share/") ||
-      url.includes("/share") ||
-      url.includes("/file") ||
-      url.includes("/files") ||
-      url.includes("/medias") ||
-      url.includes("/download")
-    );
+    return Boolean(url && /\/drive\/v1\/share(?:[/?]|$)/.test(url));
+  }
+
+  let autoInterceptedAuthToken = null;
+  let autoInterceptedPassCodeToken = null;
+  let autoInterceptedDeviceId = null;
+  let autoInterceptedCaptchaToken = null;
+
+  function extractTokenFromStorage() {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        const val = localStorage.getItem(key);
+        if (val && typeof val === "string") {
+          if (val.includes('"access_token"')) {
+            try {
+              const parsed = JSON.parse(val);
+              if (parsed.access_token) return `Bearer ${parsed.access_token}`;
+            } catch (_) {}
+          }
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  function extractDeviceIdFromStorage() {
+    try {
+      return (
+        localStorage.getItem("device_id") ||
+        localStorage.getItem("pikpak_device_id") ||
+        localStorage.getItem("deviceId") ||
+        null
+      );
+    } catch (_) {}
+    return null;
   }
 
   // Hook window.fetch
   const originalFetch = window.fetch;
   window.fetch = async function (...args) {
+    try {
+      let reqHeaders = null;
+      if (args[0] instanceof Request) {
+        reqHeaders = args[0].headers;
+      } else if (args[1] && args[1].headers) {
+        reqHeaders = args[1].headers;
+      }
+      if (reqHeaders) {
+        let auth = null;
+        if (typeof reqHeaders.get === "function") {
+          auth = reqHeaders.get("authorization") || reqHeaders.get("Authorization");
+          const dId = reqHeaders.get("x-device-id") || reqHeaders.get("X-Device-ID");
+          if (dId) autoInterceptedDeviceId = dId;
+          const cTok = reqHeaders.get("x-captcha-token") || reqHeaders.get("X-Captcha-Token");
+          if (cTok) autoInterceptedCaptchaToken = cTok;
+        } else if (typeof reqHeaders === "object") {
+          auth = reqHeaders["authorization"] || reqHeaders["Authorization"];
+          const dId = reqHeaders["x-device-id"] || reqHeaders["X-Device-ID"];
+          if (dId) autoInterceptedDeviceId = dId;
+          const cTok = reqHeaders["x-captcha-token"] || reqHeaders["X-Captcha-Token"];
+          if (cTok) autoInterceptedCaptchaToken = cTok;
+        }
+        if (auth && typeof auth === "string" && auth.toLowerCase().startsWith("bearer ")) {
+          autoInterceptedAuthToken = auth;
+        }
+      }
+    } catch (_) {}
+
     const response = await originalFetch.apply(this, args);
 
     try {
@@ -172,9 +190,11 @@
           const sId = parsed.searchParams.get("share_id");
           const pId = parsed.searchParams.get("parent_id");
           const fId = parsed.searchParams.get("file_id");
+          const pcToken = parsed.searchParams.get("pass_code_token");
           if (sId) autoInterceptedShareId = sId;
           if (pId !== null && pId !== undefined) autoInterceptedParentId = pId;
           if (fId) autoInterceptedFileId = fId;
+          if (pcToken) autoInterceptedPassCodeToken = pcToken;
         } catch (_) {}
       }
 
@@ -186,13 +206,6 @@
           const data = await clone.json().catch(() => null);
           if (data) {
             processResponseData(data);
-            if (Array.isArray(data.files)) {
-              return new Response(JSON.stringify(data), {
-                status: response.status,
-                statusText: response.statusText,
-                headers: response.headers,
-              });
-            }
           }
         }
       }
@@ -202,6 +215,14 @@
   };
 
   // Hook XMLHttpRequest
+  const origSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
+  XMLHttpRequest.prototype.setRequestHeader = function (name, value) {
+    if (name && name.toLowerCase() === "authorization" && typeof value === "string" && value.toLowerCase().startsWith("bearer ")) {
+      autoInterceptedAuthToken = value;
+    }
+    return origSetRequestHeader.apply(this, arguments);
+  };
+
   const origXHROpen = XMLHttpRequest.prototype.open;
   XMLHttpRequest.prototype.open = function (method, url, ...rest) {
     this._ppUrl = url;
@@ -218,16 +239,6 @@
             const data = JSON.parse(this.responseText);
             if (data) {
               processResponseData(data);
-              if (Array.isArray(data.files)) {
-                const modified = JSON.stringify(data);
-                try {
-                  Object.defineProperty(this, "responseText", { value: modified, configurable: true });
-                  Object.defineProperty(this, "response", {
-                    value: this.responseType === "json" ? data : modified,
-                    configurable: true,
-                  });
-                } catch (_) {}
-              }
             }
           }
         } catch (_) {}
@@ -241,10 +252,16 @@
       shareId: autoInterceptedShareId,
       parentId: autoInterceptedParentId,
       fileId: autoInterceptedFileId,
-      streamUrl: autoInterceptedUrl,
       playlist: autoInterceptedPlaylist,
+      authToken: autoInterceptedAuthToken || extractTokenFromStorage(),
+      passCodeToken: autoInterceptedPassCodeToken,
+      deviceId: autoInterceptedDeviceId || extractDeviceIdFromStorage(),
+      captchaToken: autoInterceptedCaptchaToken,
     }),
-    onStreamUrl: (cb) => streamCallbacks.push(cb),
+    getAuthToken: () => autoInterceptedAuthToken || extractTokenFromStorage(),
+    getPassCodeToken: () => autoInterceptedPassCodeToken,
+    getDeviceId: () => autoInterceptedDeviceId || extractDeviceIdFromStorage(),
+    getCaptchaToken: () => autoInterceptedCaptchaToken,
     onPlaylist: (cb) => playlistCallbacks.push(cb),
   };
 })(typeof globalThis !== "undefined" ? globalThis : typeof self !== "undefined" ? self : window);

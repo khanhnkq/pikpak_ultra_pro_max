@@ -8,7 +8,11 @@
   const BRIDGE_SOURCE_PAGE = "PIKPAK_PAGE_SCRIPT";
   const BRIDGE_SOURCE_EXT = "PIKPAK_INJECTOR_SCRIPT";
 
-  // Inject stylesheet for player UI
+  function isExpectedRuntimeLifecycleError(message = "") {
+    return /message channel closed|receiving end does not exist|extension context invalidated/i.test(message);
+  }
+
+  // Player UI is non-critical during the first paint, so load its styles lazily.
   function injectStyles() {
     const toInject = ["player/player.css", "content/pikpak-cards.css"];
     toInject.forEach((path) => {
@@ -20,10 +24,22 @@
     });
   }
 
-  // Inject modular player and content scripts in dependency order with parallel downloading (async = false)
-  function injectScripts() {
+  // The interceptor must run immediately so it cannot miss the share API calls.
+  function injectNetworkInterceptor(onReady) {
+    const scriptEl = document.createElement("script");
+    scriptEl.src = chrome.runtime.getURL("content/network-interceptor.js");
+    scriptEl.type = "text/javascript";
+    scriptEl.onload = function () {
+      scriptEl.remove();
+      onReady();
+    };
+    scriptEl.onerror = onReady;
+    (document.head || document.documentElement).appendChild(scriptEl);
+  }
+
+  // Inject the heavier player modules in dependency order after the first paint.
+  function injectPlayerScripts() {
     const scripts = [
-      "content/network-interceptor.js",
       "player/icons.js",
       "player/player-shortcuts.js",
       "player/player-drawer.js",
@@ -48,6 +64,19 @@
     });
   }
 
+  function schedulePlayerBootstrap() {
+    const bootstrap = () => {
+      injectStyles();
+      injectPlayerScripts();
+    };
+
+    if (typeof window.requestIdleCallback === "function") {
+      window.requestIdleCallback(bootstrap, { timeout: 1200 });
+    } else {
+      window.setTimeout(bootstrap, 250);
+    }
+  }
+
   // Listen for messages from main.js (Page context)
   window.addEventListener("message", (event) => {
     // Only accept messages from current window and our page script
@@ -59,7 +88,7 @@
     console.log(`%c[PikPak Injector] 📨 Forwarding to background: ${action}`, "color: #38bdf8;", payload);
 
     if (!chrome.runtime?.id) {
-      console.warn("[PikPak Injector] Extension context invalidated (Extension vừa reload). Cần F5 trang web.");
+      console.info("[PikPak Injector] Extension vừa reload; cần F5 trang web để nối lại.");
       window.postMessage(
         {
           source: BRIDGE_SOURCE_EXT,
@@ -79,7 +108,7 @@
         },
         (response) => {
           const lastErr = chrome.runtime.lastError;
-          if (lastErr) {
+          if (lastErr && !isExpectedRuntimeLifecycleError(lastErr.message)) {
             console.warn("[PikPak Injector] Runtime message warning:", lastErr.message);
           }
 
@@ -106,6 +135,5 @@
     }
   });
 
-  injectStyles();
-  injectScripts();
+  injectNetworkInterceptor(schedulePlayerBootstrap);
 })();

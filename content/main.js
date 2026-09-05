@@ -12,6 +12,11 @@
   let pendingRequests = new Map(), currentShareId = null, currentParentId = "";
   let resolvedShareData = null, activeStreamData = null, isUnlocked = false;
   let currentPlaylist = [], currentVideoIndex = -1, isAutoUnlocking = false;
+  const CLOUD_TEMP_STATE_KEY = "pikpak_temp_cloud_file_ids";
+  let currentCloudCachedFileId = null;
+  let currentCloudCachedFileIds = [];
+  let cloudTransition = Promise.resolve();
+  let playbackRequestId = 0;
 
   // ====== 1. Communication Bridge ======
   function sendToExtension(action, payload = {}) {
@@ -342,16 +347,12 @@
 
   let observerThrottleTimer = null;
   function handleDomMutations() {
-    if (isModifyingDom) return;
+    if (isModifyingDom || window.PikPakPlayer?.isModalOpen) return;
     suppressModals();
-    if (!window.PikPakPlayer?.isModalOpen) {
-      sortWebDomFiles();
-      harvestPikPakThumbnails();
-      renderDurationBadgesOnWeb();
-      checkAndAutoUnlock();
-    } else {
-      window.PikPakPlayer?.purgeUnusedMediaAndLayers?.();
-    }
+    sortWebDomFiles();
+    harvestPikPakThumbnails();
+    renderDurationBadgesOnWeb();
+    checkAndAutoUnlock();
   }
 
   const modalObserver = new MutationObserver(() => {
@@ -359,7 +360,7 @@
     observerThrottleTimer = setTimeout(() => {
       observerThrottleTimer = null;
       requestAnimationFrame(() => handleDomMutations());
-    }, 300);
+    }, 700);
   });
   modalObserver.observe(document.documentElement, { childList: true, subtree: true });
 
@@ -368,6 +369,10 @@
     if (!currentPlaylist || index < 0 || index >= currentPlaylist.length) return;
     currentVideoIndex = index;
     const target = currentPlaylist[currentVideoIndex];
+    if (!target?.id) {
+      showToast("Không xác định được ID của tập video.", true);
+      return;
+    }
     const isImg = target.type === "image" || target.isImage || /\.(jpe?g|png|webp|gif|bmp|svg|avif|heic)/i.test(target.name || "");
     showToast(`Đang nạp: ${target.name}`);
     const { shareId } = getShareContext();
@@ -379,7 +384,10 @@
   function playPrevMedia() { if (currentPlaylist.length > 0 && currentVideoIndex > 0) playMediaByIndex(currentVideoIndex - 1); else showToast("Đã là mục đầu tiên!"); }
 
   async function loadAndDisplayImage(shareId, fileId, targetItem = {}) {
+    const requestId = ++playbackRequestId;
     try {
+      await queueCloudTransition(() => cleanupPreviousCloudFile());
+      if (requestId !== playbackRequestId) return;
       let imgUrl = targetItem.thumbnailLink || targetItem.webContentLink || "";
       let fileName = targetItem.name || "Hình ảnh";
       if (fileId && (!imgUrl || !imgUrl.includes("http"))) {
@@ -408,34 +416,163 @@
     renderDurationBadgesOnWeb();
   }
 
-  // ====== 7. Stream Resolution & Action Handlers ======
+  // ====== 7. Stream Resolution & Personal Cloud FIFO Handlers ======
+
+  function getTrackedCloudFileIds() {
+    try {
+      const raw = sessionStorage.getItem(CLOUD_TEMP_STATE_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(parsed)) {
+        return [...new Set(parsed.filter((id) => typeof id === "string" && id.length > 0))];
+      }
+    } catch (_) {}
+
+    const legacyId = sessionStorage.getItem("pikpak_temp_cloud_file_id");
+    return legacyId ? [legacyId] : [];
+  }
+
+  function setTrackedCloudFileIds(fileIds) {
+    const ids = [...new Set((Array.isArray(fileIds) ? fileIds : [fileIds]).filter(Boolean))];
+    currentCloudCachedFileIds = ids;
+    currentCloudCachedFileId = ids[0] || null;
+    try {
+      if (ids.length > 0) {
+        sessionStorage.setItem(CLOUD_TEMP_STATE_KEY, JSON.stringify(ids));
+        sessionStorage.setItem("pikpak_temp_cloud_file_id", ids[0]);
+      } else {
+        sessionStorage.removeItem(CLOUD_TEMP_STATE_KEY);
+        sessionStorage.removeItem("pikpak_temp_cloud_file_id");
+      }
+    } catch (_) {}
+  }
+
+  function queueCloudTransition(operation) {
+    const next = cloudTransition.catch(() => {}).then(operation);
+    cloudTransition = next.catch(() => {});
+    return next;
+  }
+
+  async function cleanupPreviousCloudFile() {
+    const oldFileIds = currentCloudCachedFileIds.length > 0 ? currentCloudCachedFileIds : getTrackedCloudFileIds();
+    if (oldFileIds.length > 0) {
+      const authToken = window.PikPakNetwork?.getAuthToken();
+      console.log("%c[PikPak Ultra] 🧹 Đang xóa toàn bộ artifact tạm cũ trên Cloud cá nhân:", LOG_STYLE, oldFileIds);
+      try {
+        await sendToExtension("DELETE_USER_FILES", { fileIds: oldFileIds, authToken });
+        setTrackedCloudFileIds([]);
+        console.log("%c[PikPak Ultra] ✅ Đã giải phóng dung lượng Cloud cá nhân thành công!", LOG_SUCCESS);
+        return true;
+      } catch (err) {
+        console.warn("[PikPak Ultra] ⚠️ Xóa file cũ gặp lỗi, giữ lại ID để retry:", err.message);
+        return false;
+      }
+    }
+    return true;
+  }
 
   async function loadAndPlayFile(shareId, fileId) {
+    const requestId = ++playbackRequestId;
     try {
       currentShareId = shareId;
-      const streamData = await sendToExtension("GET_STREAM_URL", { shareId, fileId });
-      activeStreamData = { ...streamData, fileId };
-      const net = window.PikPakNetwork ? window.PikPakNetwork.getIntercepted() : {};
-      const streamUrl = streamData.primaryUrl || (streamData.streams && streamData.streams[0]?.url) || net.streamUrl;
-      if (!streamUrl) throw new Error("Không lấy được stream URL!");
+      activeStreamData = null;
+      isUnlocked = false;
 
       if (currentPlaylist.length > 0) {
         const idx = currentPlaylist.findIndex((v) => v.id === fileId);
         if (idx !== -1) currentVideoIndex = idx;
       }
-
       updateControls();
 
+      const targetItem = currentPlaylist.find((v) => v.id === fileId);
+      const targetName = targetItem?.name || "";
+      const authToken = window.PikPakNetwork?.getAuthToken();
+
+      window.PikPakPlayer?.showInstantLoading?.(
+        targetName || "Đang tải video...",
+        Math.max(0, currentVideoIndex),
+        currentPlaylist,
+        {
+          onPrev: () => playPrevMedia(),
+          onNext: () => playNextMedia(),
+          onSelect: (idx) => playMediaByIndex(idx),
+        }
+      );
+
+      let streamData = null;
+      let usedPersonalCloud = false;
+
+      // BƯỚC 1-3: Video phải được lưu vào Cloud cá nhân trước khi phát để tránh giới hạn preview/416.
+      if (authToken) {
+        try {
+          const loadingName = targetName || "video";
+          const setLoading = (message) => {
+            if (requestId === playbackRequestId) {
+              window.PikPakPlayer?.setLoadingMessage?.(`${message} · ${loadingName}`);
+            }
+          };
+          setLoading("Bước 1/3: Đang xóa video tạm cũ...");
+          showToast("Bước 1/3: Đang xóa video tạm cũ...", false);
+          const passCodeToken = window.PikPakNetwork?.getPassCodeToken() || "";
+          const deviceId = window.PikPakNetwork?.getDeviceId() || "";
+          console.log("%c[PikPak Ultra] 🚀 Bắt đầu lưu Cloud:", LOG_STYLE, { shareId, fileId, passCodeToken: passCodeToken ? "CÓ" : "CHƯA", targetName });
+          const restoredRes = await queueCloudTransition(async () => {
+            const cleaned = await cleanupPreviousCloudFile();
+            if (!cleaned) throw new Error("Không thể xóa video tạm cũ trên Cloud cá nhân.");
+            setLoading("Bước 2/3: Đang lưu và định vị video mới trên Cloud...");
+            showToast("Bước 2/3: Đang lưu và định vị video mới trên Cloud...", false);
+            return sendToExtension("RESTORE_AND_GET_STREAM", {
+              shareId,
+              fileId,
+              passCodeToken,
+              targetName,
+              authToken,
+              deviceId,
+            });
+          });
+          if (!restoredRes?.primaryUrl || !restoredRes?.personalFileId) {
+            throw new Error("Cloud không trả về đủ ID và stream của video mới.");
+          }
+          setTrackedCloudFileIds(restoredRes.cleanupFileIds || [restoredRes.personalFileId]);
+          streamData = restoredRes;
+          usedPersonalCloud = true;
+          setLoading("Bước 3/3: Đã lưu xong, đang khởi chạy video Full...");
+          showToast("Bước 3/3: Đã lưu xong, đang chạy video Full...", false);
+        } catch (cloudErr) {
+          console.warn("[PikPak Ultra] Luồng Cloud bị dừng:", cloudErr.message);
+          if (requestId === playbackRequestId) {
+            window.PikPakPlayer?.hideLoading?.();
+            showToast("Không thể hoàn tất bước xóa/lưu Cloud: " + cloudErr.message, true);
+          }
+          return;
+        }
+      }
+
+      if (!streamData) {
+        window.PikPakPlayer?.hideLoading?.();
+        showToast(authToken
+          ? "Cloud không trả về stream của video mới."
+          : "Bạn cần đăng nhập PikPak để lưu video vào Cloud trước khi phát.", true);
+        return;
+      }
+
+      if (requestId !== playbackRequestId) return;
+
+      activeStreamData = { ...streamData, fileId };
+      const streamUrl = streamData.primaryUrl || streamData.streams?.find((stream) => stream?.url)?.url;
+      if (!streamUrl) throw new Error("Không lấy được stream URL!");
+
       applyDirectStream(streamUrl, {
-        fileName: streamData.fileName,
+        fileName: streamData.fileName || targetName,
         fileSize: streamData.fileSize,
         playlist: currentPlaylist,
         currentIndex: currentVideoIndex,
         streams: streamData.streams,
+        isPersonalCloud: usedPersonalCloud,
       });
 
       sendToExtension("VIDEO_STREAMING_ACTIVE").catch(() => {});
     } catch (err) {
+      window.PikPakPlayer?.hideLoading?.();
       showToast("Lỗi nạp video: " + err.message, true);
     }
   }
@@ -457,7 +594,6 @@
 
     try {
       const { shareId, parentId, fileId } = getShareContext();
-      const net = window.PikPakNetwork ? window.PikPakNetwork.getIntercepted() : {};
       if (shareId && currentPlaylist.length > 0) {
         currentVideo.dataset.ppUnlocked = "true"; updateControls();
         const targetIdx = currentVideoIndex >= 0 ? currentVideoIndex : 0;
@@ -465,12 +601,10 @@
       } else if (shareId && (fileId || parentId)) {
         currentVideo.dataset.ppUnlocked = "true";
         await loadAndPlayFile(shareId, fileId || parentId);
-      } else if (net.streamUrl) {
-        currentVideo.dataset.ppUnlocked = "true";
-        if (currentPlaylist.length > 0 && currentVideoIndex === -1) currentVideoIndex = 0;
-        updateControls();
-        applyDirectStream(net.streamUrl, { playlist: currentPlaylist, currentIndex: Math.max(0, currentVideoIndex) });
-        return;
+      } else {
+        currentVideo.dataset.ppUnlocked = "failed";
+        window.PikPakPlayer?.hideLoading?.();
+        showToast("Không định vị được video share để lưu vào Cloud.", true);
       }
     } catch (err) {
       console.warn("[PikPak Ultra] Auto-unlock error:", err.message);
@@ -479,28 +613,51 @@
     }
   }
 
+  function selectPreferredStreamUrl(url, streams = [], fileName = "") {
+    const isAviOrNonNative = /\.(avi|wmv|flv|rmvb|rm|asf|divx|vob|ts|m2ts|3gp)(\?|$)/i.test(url || "") ||
+      /\.(avi|wmv|flv|rmvb|rm|asf|divx|vob|ts|m2ts|3gp)$/i.test(fileName || "");
+    const validStreams = streams.filter((stream) => stream?.url && !stream.url.includes("fid=&"));
+    const transcoded = validStreams.find((stream) => !stream.isOriginal);
+    const original = validStreams.find((stream) => stream.isOriginal);
+    if (isAviOrNonNative) return transcoded?.url || original?.url || url || "";
+    return transcoded?.url || original?.url || url || "";
+  }
+
+  async function refreshPersonalStreamUrl() {
+    const personalFileId = activeStreamData?.actualPlayFileId;
+    if (!personalFileId) throw new Error("Không có ID file Cloud để làm mới CDN.");
+
+    const refreshed = await sendToExtension("REFRESH_PERSONAL_STREAM", {
+      fileId: personalFileId,
+      targetName: activeStreamData?.fileName || "",
+      authToken: window.PikPakNetwork?.getAuthToken(),
+      deviceId: window.PikPakNetwork?.getDeviceId() || "",
+    });
+    const refreshedUrl = selectPreferredStreamUrl(refreshed?.primaryUrl, refreshed?.streams, refreshed?.fileName);
+    if (!refreshedUrl) throw new Error("Không lấy được CDN mới từ Cloud cá nhân.");
+
+    activeStreamData = { ...activeStreamData, ...refreshed };
+    return {
+      url: refreshedUrl,
+      streams: refreshed.streams || activeStreamData.streams || [],
+      fileSize: refreshed.fileSize || activeStreamData.fileSize || 0,
+    };
+  }
+
   function applyDirectStream(url, meta = {}) {
     if (!url) return;
+    if (meta.isPersonalCloud !== true) {
+      window.PikPakPlayer?.hideLoading?.();
+      showToast("Chỉ phát video sau khi đã lưu vào Cloud cá nhân.", true);
+      return;
+    }
     const allStreams = meta.streams || activeStreamData?.streams || [];
     const mediaName = meta.fileName || activeStreamData?.fileName || "";
-    const isAviOrNonNative = /\.(avi|wmv|flv|rmvb|rm|asf|divx|vob|ts|m2ts|3gp)(\?|$)/i.test(url) ||
-      /\.(avi|wmv|flv|rmvb|rm|asf|divx|vob|ts|m2ts|3gp)$/i.test(mediaName);
 
-    let effectiveUrl = url;
-    if (isAviOrNonNative && allStreams.length > 0) {
-      const transcoded = allStreams.find((s) => !s.isOriginal && s.url && !s.url.includes("fid=&"));
-      if (transcoded?.url) {
-        effectiveUrl = transcoded.url;
-      }
-    } else if (allStreams.length > 0) {
-      // Video thông thường: LUÔN DÙNG BẢN GỐC (Original) để đảm bảo 100% phát mượt mà
-      const origStream = allStreams.find((s) => s.isOriginal && s.url && !s.url.includes("fid=&"));
-      if (origStream?.url) {
-        effectiveUrl = origStream.url;
-      }
-    }
+    const effectiveUrl = selectPreferredStreamUrl(url, allStreams, mediaName);
 
     if (window.PikPakPlayer?.isModalOpen && window.PikPakPlayer?.currentStreamUrl === effectiveUrl) {
+      window.PikPakPlayer?.hideLoading?.();
       return;
     }
     isUnlocked = true;
@@ -515,35 +672,18 @@
       playlist: meta.playlist || currentPlaylist,
       currentIndex: meta.currentIndex !== undefined ? meta.currentIndex : currentVideoIndex,
       streams: allStreams,
+      onRefreshRequest: refreshPersonalStreamUrl,
       onPrev: () => playPrevMedia(),
       onNext: () => playNextMedia(),
       onSelect: (idx) => playMediaByIndex(idx),
       onDownload: () => handleDownloadClick(),
-      onRefreshRequest: () => {
-        if (currentShareId && activeStreamData?.fileId) {
-          sendToExtension("REFRESH_STREAM_URL", { shareId: currentShareId, fileId: activeStreamData.fileId })
-            .then((newData) => {
-              if (newData && newData.primaryUrl) {
-                activeStreamData = newData;
-                window.PikPakPlayer.changeSource(newData.primaryUrl);
-                showToast("Đã cập nhật link stream mới!");
-              } else {
-                console.warn("[PikPak Ultra] Refresh stream returned empty primaryUrl");
-              }
-            })
-            .catch((err) => {
-              console.warn("[PikPak Ultra] Error refreshing stream URL:", err.message);
-            });
-        }
-      },
     });
 
     suppressModals();
   }
 
   function handleDownloadClick(customUrl, customName) {
-    const net = window.PikPakNetwork ? window.PikPakNetwork.getIntercepted() : {};
-    const url = customUrl || activeStreamData?.primaryUrl || net.streamUrl;
+    const url = customUrl || activeStreamData?.primaryUrl;
     if (url) {
       const a = Object.assign(document.createElement("a"), { href: url, download: customName || activeStreamData?.fileName || "media", target: "_blank" });
       (document.body || document.documentElement).appendChild(a);
@@ -694,11 +834,10 @@
         currentVideoIndex = currentPlaylist.indexOf(target);
         loadAndPlayFile(shareId, target.id);
       } else {
-        const net = window.PikPakNetwork ? window.PikPakNetwork.getIntercepted() : {};
-        if (net.streamUrl) applyDirectStream(net.streamUrl);
-        else sendToExtension("RESOLVE_SHARE", { shareId }).then((res) => {
+        sendToExtension("RESOLVE_SHARE", { shareId }).then((res) => {
           const list = res?.mediaFiles || res?.videos || [];
           if (list.length > 0) { currentPlaylist = sortPlaylist(list); harvestPikPakThumbnails(); loadAndPlayFile(shareId, currentPlaylist[0].id); }
+          else showToast("Không tìm thấy video để lưu vào Cloud.", true);
         }).catch((err) => showToast("Lỗi mở media: " + err.message, true));
       }
     }
@@ -848,28 +987,67 @@
       sendToExtension("TAB_READY", { shareId, parentId }).catch(() => {});
       prefetchPlaylist();
     }
-  }, 1000);
+  }, 2000);
 
   if (window.PikPakNetwork) {
-    window.PikPakNetwork.onStreamUrl((url) => {
+    window.PikPakNetwork.onPlaylist((videos) => {
       const { shareId, parentId, fileId } = getShareContext();
       if (shareId && (fileId || parentId || currentPlaylist.length > 0)) {
         checkAndAutoUnlock();
-      } else if (url && !isUnlocked) {
-        applyDirectStream(url, {
-          playlist: currentPlaylist,
-          currentIndex: currentVideoIndex >= 0 ? currentVideoIndex : 0,
-        });
       }
-    });
-    window.PikPakNetwork.onPlaylist((videos) => {
       if (videos?.length > 0) {
-        currentPlaylist = sortPlaylist(videos);
-        harvestPikPakThumbnails();
-        updateControls();
+        const incomingPlaylist = sortPlaylist(videos);
+        // PikPak đôi khi gửi response chi tiết chỉ có 1 file sau khi đã gửi
+        // playlist đầy đủ. Không để response ngắn này làm mất các tập trong drawer.
+        if (currentPlaylist.length === 0 || incomingPlaylist.length >= currentPlaylist.length) {
+          currentPlaylist = incomingPlaylist;
+          harvestPikPakThumbnails();
+          updateControls();
+        }
       }
     });
   }
 
-  prefetchPlaylist();
+  // Dọn dẹp video tạm trên Cloud cá nhân khi đóng tab hoặc điều hướng khỏi trang
+  window.addEventListener("pagehide", () => {
+    const tempIds = currentCloudCachedFileIds.length > 0 ? currentCloudCachedFileIds : getTrackedCloudFileIds();
+    const token = window.PikPakNetwork?.getAuthToken();
+    if (tempIds.length > 0 && token) {
+      try {
+        fetch("https://api-drive.mypikpak.com/drive/v1/files:batchDelete", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": token,
+            "X-Client-ID": "YNxT9w7GMdWvEOKa",
+          },
+          body: JSON.stringify({ ids: tempIds }),
+          keepalive: true,
+        }).catch(() => {});
+      } catch (_) {}
+    }
+  });
+
+  // Tự động dọn dẹp file tạm còn lưu từ phiên trước (nếu có). Chụp danh sách
+  // ngay lúc khởi tạo để không xóa nhầm artifact của video đang phát.
+  const startupTempIds = getTrackedCloudFileIds();
+  setTimeout(() => {
+    const trackedIds = new Set(getTrackedCloudFileIds());
+    const leftoverTempIds = startupTempIds.filter((id) => trackedIds.has(id));
+    const token = window.PikPakNetwork?.getAuthToken();
+    if (leftoverTempIds.length > 0 && token) {
+      queueCloudTransition(() => sendToExtension("DELETE_USER_FILES", { fileIds: leftoverTempIds, authToken: token }))
+        .then(() => {
+          const remainingIds = getTrackedCloudFileIds().filter((id) => !leftoverTempIds.includes(id));
+          setTrackedCloudFileIds(remainingIds);
+          console.log("%c[PikPak Ultra] 🧹 Đã dọn dẹp file tạm từ phiên duyệt trước!", LOG_SUCCESS);
+        })
+        .catch(() => {});
+    }
+  }, 1500);
+
+  const schedulePrefetch = window.requestIdleCallback
+    ? (callback) => window.requestIdleCallback(callback, { timeout: 1500 })
+    : (callback) => setTimeout(callback, 800);
+  schedulePrefetch(() => prefetchPlaylist());
 })();

@@ -1,6 +1,6 @@
 /**
  * PikPak Ultra Pro Max - Background Service Worker
- * Coordinates API requests, token management, and streaming resolution.
+ * Coordinates API requests, token management, and Cloud restore/delete operations.
  */
 
 importScripts("lib/constants.js", "lib/md5.js", "lib/pikpak-api.js");
@@ -27,8 +27,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         .catch((err) => sendResponse({ success: false, error: err.message, code: err.code }));
       return true;
 
-    case "REFRESH_STREAM_URL":
-      handleRefreshStreamUrl(message.payload)
+    case "RESTORE_AND_GET_STREAM":
+      handleRestoreAndGetStream(message.payload)
+        .then((data) => sendResponse({ success: true, data }))
+        .catch((err) => sendResponse({ success: false, error: err.message, code: err.code }));
+      return true;
+
+    case "REFRESH_PERSONAL_STREAM":
+      handleRefreshPersonalStream(message.payload)
+        .then((data) => sendResponse({ success: true, data }))
+        .catch((err) => sendResponse({ success: false, error: err.message, code: err.code }));
+      return true;
+
+    case "DELETE_USER_FILES":
+      handleDeleteUserFiles(message.payload)
         .then((data) => sendResponse({ success: true, data }))
         .catch((err) => sendResponse({ success: false, error: err.message, code: err.code }));
       return true;
@@ -98,31 +110,34 @@ async function handleGetStreamUrl({ shareId, fileId }) {
   return streams;
 }
 
-async function handleRefreshStreamUrl({ shareId, fileId }) {
-  console.log(`[ServiceWorker] 🔄 REFRESH_STREAM_URL: shareId=${shareId}, fileId=${fileId}`);
-  if (!shareId || !fileId) throw new Error("Missing shareId or fileId");
-  const cacheKey = `${shareId}:${fileId}`;
-  const previousCached = client.cache.get(cacheKey);
-  client.cache.delete(cacheKey);
-  try {
-    const refreshed = await client.resolveMediaStreams(shareId, fileId);
-    if (refreshed?.primaryUrl) {
-      return refreshed;
-    }
-    if (previousCached?.data?.primaryUrl) {
-      console.warn(`[ServiceWorker] ⚠️ Refreshed stream had no primaryUrl, falling back to previous cache`);
-      client.cache.set(cacheKey, previousCached);
-      return previousCached.data;
-    }
-    return refreshed;
-  } catch (err) {
-    if (previousCached?.data?.primaryUrl) {
-      console.warn(`[ServiceWorker] ⚠️ Refresh error (${err.message}), falling back to previous cache`);
-      client.cache.set(cacheKey, previousCached);
-      return previousCached.data;
-    }
-    throw err;
+async function handleRestoreAndGetStream({ shareId, fileId, passCodeToken = "", targetName = "", authToken = "", deviceId = "" }) {
+  console.log(`[ServiceWorker] ⚡ RESTORE_AND_GET_STREAM: shareId=${shareId}, fileId=${fileId}, targetName=${targetName}`);
+  if (deviceId) {
+    client.deviceId = deviceId;
   }
+  if (authToken) {
+    client.setAuthToken(authToken);
+  }
+  return await client.restoreAndResolveStream(shareId, fileId, passCodeToken, targetName);
+}
+
+async function handleRefreshPersonalStream({ fileId, targetName = "", authToken = "", deviceId = "" }) {
+  console.log(`[ServiceWorker] 🔄 REFRESH_PERSONAL_STREAM: fileId=${fileId}`);
+  if (deviceId) {
+    client.deviceId = deviceId;
+  }
+  if (authToken) {
+    client.setAuthToken(authToken);
+  }
+  return await client.resolvePersonalStream(fileId, targetName);
+}
+
+async function handleDeleteUserFiles({ fileIds = [], authToken = "" }) {
+  console.log(`[ServiceWorker] 🗑️ DELETE_USER_FILES: fileIds=${JSON.stringify(fileIds)}`);
+  if (authToken) {
+    client.setAuthToken(authToken);
+  }
+  return await client.deleteUserFiles(fileIds);
 }
 
 function updateBadge(tabId, text, color) {

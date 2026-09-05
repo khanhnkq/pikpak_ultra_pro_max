@@ -53,21 +53,5 @@
       "regexFilter": "^https?://(api-drive|user)\\.(mypikpak\\.(com|net)|pikpak\\.me|pikpakdrive\\.com)/.*",
       "resourceTypes": ["xmlhttprequest", "other"]
     }
-  },
-  {
-    "id": 4,
-    "priority": 2,
-    "action": {
-      "type": "modifyHeaders",
-      "requestHeaders": [
-        { "header": "referer", "operation": "remove" },
-        { "header": "origin", "operation": "remove" },
-        { "header": "user-agent", "operation": "set", "value": "PikPak/1.53.2 (Linux; U; Android 14; M2004j7ac; Build/UKQ1.231108.001)" }
-      ]
-    },
-    "condition": {
-      "regexFilter": "^https?://.*\\.(mypikpak\\.(com|net)|pikpak\\.me|pikpakdrive\\.com)/.*",
-      "resourceTypes": ["media"]
-    }
   }
 ]

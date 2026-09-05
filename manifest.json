@@ -38,8 +38,8 @@
   "content_scripts": [
     {
       "matches": [
-        "*://*.mypikpak.com/*",
-        "*://*.mypikpak.net/*"
+        "*://*.mypikpak.com/s/*",
+        "*://*.mypikpak.net/s/*"
       ],
       "js": [
         "content/injector.js"
