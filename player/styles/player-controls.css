@@ -12,18 +12,22 @@
   z-index: 2147483647 !important;
   display: flex;
   background: rgba(4, 5, 8, 0.98);
-  backdrop-filter: blur(32px);
-  -webkit-backdrop-filter: blur(32px);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
   font-family: var(--pp-font);
+  overflow: hidden !important;
 }
 
 #pikpak-ultra-cinema-modal.active {
   opacity: 1;
   pointer-events: auto;
+}
+
+body.pp-cinema-active,
+html.pp-cinema-active {
+  overflow: hidden !important;
 }
 
 /* Tối ưu hiệu năng: Ẩn triệt để video gốc của PikPak ở nền (NGOẠI TRỪ modal player và preview của extension) */
@@ -43,26 +47,37 @@
 }
 
 /* Đảm bảo 100% modal player của extension luôn hiển thị rõ ràng */
-#pikpak-ultra-cinema-modal,
-#pikpak-ultra-cinema-modal * {
+#pikpak-ultra-cinema-modal {
   visibility: visible !important;
 }
 
 /* Top-Left Video Title & Episode Badge */
 .pp-modal-top-info {
   position: absolute; top: 16px; left: 20px; z-index: 2147483645;
-  display: flex; align-items: center; gap: 10px; padding: 6px 14px;
-  background: var(--pp-glass-bg); backdrop-filter: blur(28px) saturate(180%); -webkit-backdrop-filter: blur(28px) saturate(180%);
+  display: flex; align-items: center; gap: 8px; padding: 4px 14px 4px 6px;
+  background: rgba(14, 18, 26, 0.94);
   border: 1px solid var(--pp-glass-border); border-radius: var(--pp-radius-pill);
-  color: var(--pp-text-primary); font-size: 13px; font-weight: 600; max-width: 45vw;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: none; pointer-events: none;
+  color: var(--pp-text-primary); font-size: 13px; font-weight: 600; max-width: 50vw;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: none; pointer-events: auto;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45); transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.pp-top-back-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  padding: 4px 10px 4px 8px; height: 28px;
+  background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--pp-radius-pill); color: #ffffff; font-size: 12px; font-weight: 600;
+  cursor: pointer; outline: none; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap; font-family: inherit;
+}
+.pp-top-back-btn:hover {
+  background: #0a84ff; border-color: #0a84ff; color: #ffffff;
+  transform: translateX(-2px); box-shadow: 0 2px 10px rgba(10, 132, 255, 0.4);
 }
 .pp-modal-counter {
   display: inline-flex; align-items: center; padding: 2px 8px; background: var(--pp-accent-subtle);
   border: 1px solid var(--pp-accent-border); border-radius: 12px; font-size: 11px; font-weight: 700; color: var(--pp-accent); white-space: nowrap;
 }
-.pp-modal-title { font-size: 13px; font-weight: 600; color: var(--pp-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pp-modal-title { font-size: 13px; font-weight: 600; color: var(--pp-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
 
 /* Top-Right Video Action Group (Download & Close) */
 .pp-modal-top-actions {
@@ -72,8 +87,7 @@
 }
 .pp-top-btn {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 36px; height: 36px; background: var(--pp-glass-bg);
-  backdrop-filter: blur(28px) saturate(180%); -webkit-backdrop-filter: blur(28px) saturate(180%);
+  width: 36px; height: 36px; background: rgba(18, 22, 32, 0.94);
   border: 1px solid var(--pp-glass-border); border-radius: 50%; color: var(--pp-icon-color);
   cursor: pointer; outline: none; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
@@ -126,9 +140,7 @@
   min-width: unset;
   padding: 0 18px;
   height: 36px;
-  background: rgba(10, 14, 26, 0.35) !important;
-  backdrop-filter: blur(16px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
+  background: rgba(10, 14, 26, 0.94) !important;
   border: 1px solid rgba(255, 255, 255, 0.14) !important;
   border-radius: 9999px;
   color: #ffffff;
@@ -190,11 +202,9 @@
   font-weight: 500;
   color: var(--pp-text-secondary);
   letter-spacing: 0.2px;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   padding: 4px 14px;
   border-radius: var(--pp-radius-pill);
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.85);
 }
 @keyframes ppSpin { to { transform: rotate(360deg); } }
 
@@ -427,9 +437,7 @@
   position: absolute;
   bottom: 45px;
   right: 0;
-  background: rgba(16, 18, 26, 0.94);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
+  background: rgba(16, 18, 26, 0.98);
   border: 1px solid var(--pp-glass-border);
   border-radius: var(--pp-radius-md);
   padding: 6px;
@@ -456,14 +464,241 @@
 .pp-dropdown-item:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
 .pp-dropdown-item.active { background: var(--pp-accent-subtle); color: var(--pp-accent); font-weight: 600; }
 
+/* Buffer Booster Button & Dropdown */
+#pp-booster-btn {
+  color: var(--pp-icon-color);
+  position: relative;
+}
+
+#pp-booster-btn.active {
+  color: #38bdf8;
+}
+
+#pp-booster-btn.active:hover {
+  background: rgba(56, 189, 248, 0.15);
+  color: #7dd3fc;
+}
+
+@keyframes pp-booster-breathe {
+  0%, 100% { opacity: 1; filter: drop-shadow(0 0 2px rgba(56, 189, 248, 0.4)); }
+  50% { opacity: 0.65; filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.8)); }
+}
+
+#pp-booster-btn.pulse svg {
+  animation: pp-booster-breathe 1.8s ease-in-out infinite;
+}
+
+#pp-booster-menu {
+  min-width: 210px;
+}
+
+.pp-dropdown-item-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pp-dropdown-item-left svg {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.pp-dropdown-header {
+  padding: 6px 12px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--pp-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 4px;
+}
+
+/* Quality & Compression styling in Dropdown */
+.pp-quality-name {
+  font-weight: 600;
+}
+.pp-quality-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+.pp-bitrate-text {
+  color: var(--pp-text-muted);
+  font-weight: 500;
+}
+.pp-compress-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(16, 185, 129, 0.18);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #34d399;
+  font-size: 10px;
+  font-weight: 700;
+}
+.pp-orig-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(14, 165, 233, 0.18);
+  border: 1px solid rgba(14, 165, 233, 0.35);
+  color: #38bdf8;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* Download dropdown in Top Actions */
+.pp-download-wrap {
+  position: relative;
+}
+.pp-download-dropdown {
+  position: absolute;
+  top: 45px;
+  right: 0;
+  bottom: auto;
+  min-width: 220px;
+  background: rgba(16, 18, 26, 0.98);
+  border: 1px solid var(--pp-glass-border);
+  border-radius: var(--pp-radius-md);
+  padding: 6px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65);
+}
+
+.pp-progress-buffer {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.22), rgba(56, 189, 248, 0.35)) !important;
+}
+
 /* Duration badge on PikPak web interface */
 .pp-web-duration-badge {
   position: absolute !important; bottom: 6px !important; right: 6px !important;
-  background: rgba(0, 0, 0, 0.85) !important; backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important; color: #ffffff !important;
+  background: rgba(0, 0, 0, 0.88) !important;
+  color: #ffffff !important;
   font-size: 11px !important; font-weight: 700 !important; padding: 2px 6px !important;
   border-radius: 4px !important; line-height: 1.2 !important; pointer-events: none !important;
   z-index: 20 !important; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5) !important;
   letter-spacing: 0.3px !important; display: inline-block !important;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif !important;
 }
+
+/* ============================================================
+   Playback Error / Unsupported Format Recovery Overlay
+   ============================================================ */
+.pp-playback-error-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2147483646;
+  background: rgba(4, 6, 12, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: pp-fade-in 0.25s ease-out forwards;
+}
+
+.pp-playback-error-card {
+  background: rgba(18, 22, 34, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  padding: 32px 28px;
+  max-width: 480px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(245, 158, 11, 0.15);
+}
+
+.pp-error-icon-wrap {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: rgba(245, 158, 11, 0.14);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+.pp-error-title {
+  color: #ffffff;
+  font-size: 17px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  letter-spacing: 0.2px;
+}
+
+.pp-error-desc {
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 13.5px;
+  line-height: 1.55;
+  margin-bottom: 24px;
+}
+
+.pp-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.pp-error-btn {
+  height: 38px;
+  padding: 0 18px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.pp-error-btn-primary {
+  background: #0a84ff;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 14px rgba(10, 132, 255, 0.4);
+}
+.pp-error-btn-primary:hover {
+  background: #0070e0;
+  transform: translateY(-1px);
+}
+
+.pp-error-btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.pp-error-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.pp-error-footer {
+  margin-top: 18px;
+}
+
+.pp-error-next-btn {
+  background: transparent;
+  border: none;
+  color: #38bdf8;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+.pp-error-next-btn:hover {
+  color: #7dd3fc;
+  background: rgba(56, 189, 248, 0.1);
+}
+

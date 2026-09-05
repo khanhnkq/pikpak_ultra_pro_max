@@ -107,9 +107,7 @@
   min-width: 52px;
   height: 28px;
   padding: 0 10px;
-  background: var(--pp-glass-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(18, 20, 26, 0.94);
   border: 1px solid var(--pp-glass-border);
   border-radius: var(--pp-radius-pill);
   font-size: 11px;

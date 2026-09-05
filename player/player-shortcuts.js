@@ -87,6 +87,42 @@
           return;
         }
 
+        // Phím Back / Quay lại: Backspace hoặc Alt+ArrowLeft hoặc BrowserBack
+        if (e.key === "Backspace" || (e.altKey && e.key === "ArrowLeft") || e.key === "BrowserBack") {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log("[PikPak Cinema] 🔙 Phím tắt Back/Backspace -> Đang đóng video...");
+          this.player.closeCinemaModal();
+          return;
+        }
+
+        // Xử lý đổi tập [ ] trực tiếp - Độc lập, không cần phím bổ trợ (Cmd / Ctrl)
+        // Hỗ trợ e.code === "BracketLeft" / "BracketRight" để vượt qua bộ gõ tiếng Việt (Telex/VNI trên macOS/Windows)
+        const isBracketLeft = e.code === "BracketLeft" || e.key === "[" || e.key === "{" || ((e.key === "p" || e.key === "P") && !e.metaKey && !e.ctrlKey);
+        const isBracketRight = e.code === "BracketRight" || e.key === "]" || e.key === "}" || ((e.key === "n" || e.key === "N") && !e.metaKey && !e.ctrlKey);
+
+        if (isBracketLeft) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (this.player.navigationHandlers?.onPrev) {
+            this.showHud(this.player.isImageMode ? "Mục trước" : "Tập trước", icons.prev);
+            this.player.navigationHandlers.onPrev();
+          }
+          this.player.resetIdleTimer();
+          return;
+        }
+
+        if (isBracketRight) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (this.player.navigationHandlers?.onNext) {
+            this.showHud(this.player.isImageMode ? "Mục tiếp" : "Tập tiếp", icons.next);
+            this.player.navigationHandlers.onNext();
+          }
+          this.player.resetIdleTimer();
+          return;
+        }
+
         // Image Mode Keyboard Shortcuts
         if (this.player.isImageMode) {
           switch (e.key) {
@@ -236,6 +272,12 @@
             this.player.toggleFullscreen();
             break;
 
+          case "b":
+          case "B":
+            e.preventDefault();
+            document.getElementById("pp-booster-menu")?.classList.toggle("show");
+            break;
+
           case "[":
           case "p":
           case "P":
@@ -360,9 +402,10 @@
               <div class="pp-shortcut-row"><span>Phóng to / Thu nhỏ ảnh</span><kbd>+ / - (hoặc Cuộn chuột)</kbd></div>
               <div class="pp-shortcut-row"><span>Đặt lại cỡ ảnh / Kéo rê</span><kbd>Phím 0 / Kéo chuột</kbd></div>
               <div class="pp-shortcut-row"><span>Xoay ảnh 90°</span><kbd>R</kbd></div>
+              <div class="pp-shortcut-row"><span>Tăng tốc bộ đệm (Booster)</span><kbd>B</kbd></div>
               <div class="pp-shortcut-row"><span>Tăng / Giảm tốc độ</span><kbd>&gt; / &lt;</kbd></div>
               <div class="pp-shortcut-row"><span>Bật / Tắt phím tắt</span><kbd>?</kbd></div>
-              <div class="pp-shortcut-row"><span>Đóng Rạp Chiếu</span><kbd>Esc</kbd></div>
+              <div class="pp-shortcut-row"><span>Quay lại / Đóng video</span><kbd>Esc / Backspace</kbd></div>
             </div>
           </div>
         </div>

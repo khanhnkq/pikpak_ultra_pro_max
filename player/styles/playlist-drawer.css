@@ -1,49 +1,59 @@
 /**
- * PikPak Ultra Pro Max - Bottom Video Thumbnail Carousel Drawer
+ * PikPak Ultra Pro Max - Right Vertical Episode / Playlist Sidebar
+ * Floating Card Design - Nổi độc lập, không dính mép màn hình, không làm mờ video.
  */
 
 .pp-playlist-drawer {
   position: absolute;
-  bottom: 84px; /* Nằm ngay trên thanh điều khiển */
-  left: 20px;
-  right: 20px;
-  background: rgba(14, 16, 24, 0.94);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
-  border: 1px solid var(--pp-glass-border);
-  border-radius: var(--pp-radius-md);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.75);
+  top: 68px; /* Đặt dưới thanh công cụ trên cùng (Download/Close) */
+  bottom: 84px; /* Nằm nổi độc lập phía trên thanh điều khiển dưới */
+  right: 16px;  /* Cách mép phải 16px */
+  width: 168px; /* Bề ngang gọn gàng, đủ không gian đệm 8px cho thumbnail & duration */
+  max-width: calc(100vw - 32px);
+  background: transparent !important; /* Không background container, giữ video rõ ràng 100% */
+  border: none !important;
+  box-shadow: none !important;
   display: flex;
   flex-direction: column;
-  padding: 12px 14px;
-  gap: 10px;
-  z-index: 40;
-  opacity: 0;
-  transform: translateY(20px);
+  padding: 0;
+  gap: 8px;
+  z-index: 2147483646; /* Overlay độc lập nổi trên video, không đẩy bất kỳ thành phần nào */
+  transform: translate3d(calc(100% + 30px), 0, 0);
+  visibility: hidden;
   pointer-events: none;
-  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+  backface-visibility: hidden;
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.28s;
+  font-family: var(--pp-font);
+  user-select: none;
+  box-sizing: border-box;
+  overflow: visible;
 }
 
 .pp-playlist-drawer.show {
-  opacity: 1;
-  transform: translateY(0);
+  visibility: visible;
+  transform: translate3d(0, 0, 0);
   pointer-events: auto;
 }
 
 .pp-drawer-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 4px;
+  display: none !important; /* Không cần hiển thị header vì người dùng dùng phím E để bật tắt */
 }
 
 .pp-drawer-title {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   color: var(--pp-text-primary);
+  letter-spacing: 0.2px;
+}
+
+.pp-drawer-title svg {
+  width: 18px;
+  height: 18px;
+  color: var(--pp-accent);
 }
 
 .pp-drawer-count {
@@ -57,74 +67,115 @@
 }
 
 .pp-drawer-close {
-  background: transparent;
-  border: none;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   color: var(--pp-text-secondary);
-  font-size: 14px;
+  font-size: 13px;
   cursor: pointer;
-  padding: 4px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
 
 .pp-drawer-close:hover {
+  background: rgba(255, 255, 255, 0.14);
   color: #fff;
+  transform: scale(1.08);
+}
+
+.pp-drawer-close:active {
+  transform: scale(0.92);
 }
 
 .pp-drawer-body {
   position: relative;
+  flex: 1;
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
   width: 100%;
+  min-height: 0;
+  overflow: visible;
 }
 
 .pp-drawer-scroll-track {
+  flex: 1;
   display: flex;
-  align-items: center;
-  gap: 12px;
-  overflow-x: auto;
-  overflow-y: hidden;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  overflow-x: hidden;
   scroll-behavior: smooth;
   width: 100%;
-  padding: 4px 2px;
+  padding: 6px 8px 12px 8px; /* Đủ đệm 8px hai bên để hover không bị container cắt góc */
+  box-sizing: border-box;
 }
 
 .pp-drawer-scroll-track::-webkit-scrollbar {
-  height: 4px;
+  width: 4px;
+}
+
+.pp-drawer-scroll-track::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .pp-drawer-scroll-track::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.16);
   border-radius: 4px;
 }
 
-/* Individual Thumbnail Card */
+.pp-drawer-scroll-track::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* Individual Episode Card in Vertical List - Không viền đen, thumbnail tràn viền sắc nét */
 .pp-thumb-card {
-  flex: 0 0 150px;
-  height: 88px;
-  position: relative;
-  border-radius: var(--pp-radius-sm);
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border-radius: 8px;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
   cursor: pointer;
-  border: 1px solid var(--pp-glass-border);
-  background: #10121a;
-  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.16s ease;
+  position: relative;
+  flex-shrink: 0;
   user-select: none;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .pp-thumb-card:hover {
-  transform: translateY(-3px) scale(1.03);
-  border-color: var(--pp-glass-border-hover);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+  transform: translateX(-3px);
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
-.pp-thumb-card.active {
-  border: 2px solid var(--pp-accent);
-  box-shadow: 0 0 16px var(--pp-accent-glow);
+.pp-thumb-card:hover .pp-thumb-media {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.pp-thumb-card.active .pp-thumb-media {
+  border: 2px solid rgba(56, 189, 248, 0.95);
+}
+
+/* 16:9 Thumbnail Frame */
+.pp-thumb-media {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+  background: #080a10;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: border-color 0.16s ease;
+  box-sizing: border-box;
 }
 
 .pp-thumb-img {
@@ -140,88 +191,53 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #181c28, #0e1018);
+  background: linear-gradient(135deg, #161a26, #0c0f16);
   color: var(--pp-accent);
 }
 
-.pp-thumb-overlay {
+.pp-thumb-fallback svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* Badges on Thumbnail */
+.pp-thumb-idx {
   position: absolute;
-  inset: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, transparent 60%);
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  padding: 6px 8px;
+  top: 4px;
+  left: 4px;
+  padding: 1px 5px;
+  background: rgba(0, 0, 0, 0.85);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 3px;
+  line-height: 1.2;
+}
+
+.pp-thumb-duration {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  padding: 1px 5px;
+  background: rgba(0, 0, 0, 0.88);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 3px;
+  letter-spacing: 0.2px;
+  line-height: 1.2;
 }
 
 .pp-thumb-badge {
   position: absolute;
   top: 4px;
-  left: 4px;
-  padding: 2px 6px;
-  background: var(--pp-accent);
-  color: #fff;
-  font-size: 9px;
-  font-weight: 700;
-  border-radius: 4px;
-  text-transform: uppercase;
-}
-
-.pp-thumb-idx {
-  position: absolute;
-  top: 4px;
   right: 4px;
-  padding: 2px 5px;
-  background: rgba(0, 0, 0, 0.65);
-  backdrop-filter: blur(8px);
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 10px;
-  font-weight: 700;
-  border-radius: 4px;
-}
-
-.pp-thumb-duration {
-  position: absolute;
-  bottom: 24px;
-  right: 6px;
   padding: 1px 5px;
-  background: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  color: #ffffff;
-  font-size: 10px;
-  font-weight: 700;
+  background: var(--pp-accent);
+  color: #06080e;
+  font-size: 9px;
+  font-weight: 800;
   border-radius: 3px;
-  letter-spacing: 0.3px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
-}
-
-.pp-thumb-name {
-  font-size: 11px;
-  font-weight: 600;
-  color: #fff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.pp-drawer-arrow {
-  flex: 0 0 28px;
-  height: 88px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--pp-glass-border);
-  border-radius: var(--pp-radius-sm);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 18px;
-  transition: all 0.2s ease;
-  user-select: none;
-}
-
-.pp-drawer-arrow:hover {
-  background: rgba(255, 255, 255, 0.16);
-  color: var(--pp-accent);
+  text-transform: uppercase;
+  line-height: 1.2;
 }

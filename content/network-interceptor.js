@@ -34,6 +34,43 @@
     return `${String(m).padStart(2, "0")}:${String(remSec).padStart(2, "0")}`;
   }
 
+  function getFileCategory(item) {
+    if (!item) return 4;
+    if (item.kind === "drive#folder" || item.type === "folder") return 1;
+    const name = (item.name || "").toLowerCase();
+    const ext = name.substring(name.lastIndexOf("."));
+    const mime = (item.mime_type || item.mimeType || "").toLowerCase();
+    const isVideo = /\.(mp4|mkv|avi|mov|wmv|flv|webm|ts|m4v|3gp|rmvb|iso|vob|m2ts)$/i.test(name) || mime.startsWith("video/") || item.isVideo || item.type === "video";
+    if (isVideo) return 2;
+    const isImage = /\.(jpe?g|png|webp|gif|bmp|svg|avif|heic|tiff|ico)$/i.test(name) || mime.startsWith("image/") || item.isImage || item.type === "image";
+    if (isImage) return 3;
+    return 4;
+  }
+
+  function getItemDuration(item) {
+    if (!item) return 0;
+    if (typeof item.duration === "number" && !isNaN(item.duration)) return item.duration;
+    const dur = parseInt(item.params?.duration || item.medias?.[0]?.video?.duration || 0, 10);
+    return isNaN(dur) ? 0 : dur;
+  }
+
+  function compareMediaItems(a, b) {
+    const catA = getFileCategory(a);
+    const catB = getFileCategory(b);
+    if (catA !== catB) return catA - catB;
+
+    // Nếu cả hai đều là video: video dài nhất trước (duration giảm dần)
+    if (catA === 2) {
+      const durA = getItemDuration(a);
+      const durB = getItemDuration(b);
+      if (durA !== durB) return durB - durA;
+    }
+
+    const nameA = String(a?.name || "");
+    const nameB = String(b?.name || "");
+    return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
+  }
+
   function notifyPlaylist(videos) {
     autoInterceptedPlaylist = videos;
     playlistCallbacks.forEach((cb) => {
@@ -47,12 +84,12 @@
       autoInterceptedFileId = data.file_info.id;
     }
     if (data.files && Array.isArray(data.files)) {
+      data.files.sort(compareMediaItems);
       const mediaList = [];
       data.files.forEach((item) => {
         if (item && item.kind !== "drive#folder") {
-          const ext = (item.name || "").substring((item.name || "").lastIndexOf(".")).toLowerCase();
-          const isVid = /\.(mp4|mkv|avi|mov|wmv|flv|webm|ts|m4v|3gp|rmvb)/i.test(ext) || (item.mime_type || "").startsWith("video/");
-          const isImg = /\.(jpe?g|png|webp|gif|bmp|svg|avif|heic|tiff)/i.test(ext) || (item.mime_type || "").startsWith("image/");
+          const isVid = getFileCategory(item) === 2;
+          const isImg = getFileCategory(item) === 3;
           if (isVid || isImg) {
             const durSec = parseInt(item.params?.duration || item.medias?.[0]?.video?.duration || 0, 10);
             mediaList.push({
@@ -72,22 +109,47 @@
         }
       });
       if (mediaList.length > 0) {
-        console.log(`%c[PikPak Ultra] 🎯 Bắt được ${mediaList.length} media từ API:`, LOG_SUCCESS, mediaList);
+        mediaList.sort(compareMediaItems);
         notifyPlaylist(mediaList);
       }
     }
     let streamUrl = "";
-    if (data.medias && data.medias.length > 0) {
-      const orig = data.medias.find((m) => m.media_name === "original") || data.medias[0];
-      if (orig?.link?.url) streamUrl = orig.link.url;
+    const fileName = data.name || "";
+    const fileExt = fileName.includes(".") ? fileName.split(".").pop().toLowerCase() : "";
+    const isNonNative = ["avi", "wmv", "flv", "rmvb", "rm", "asf", "divx", "vob", "ts", "m2ts", "3gp"].includes(fileExt) ||
+      /video\/(x-msvideo|avi|msvideo|x-ms-wmv|x-flv)/i.test(data.mime_type || "");
+
+    const origMedia = data.medias?.find((m) => m.media_name === "original" && m.link?.url && !m.link.url.includes("fid=&"));
+    const directUrl = (data.web_content_link && !data.web_content_link.includes("fid=&")) ? data.web_content_link : "";
+
+    if (!isNonNative) {
+      // Video thông thường: LUÔN ƯU TIÊN Original (file gốc), không bao giờ lấy bản nén 720P/1080P bị lỗi
+      streamUrl = origMedia?.link?.url || directUrl;
+    } else {
+      // File non-native (.avi): thử bản nén MP4 nếu có
+      const transcoded = data.medias?.find((m) => m.media_name !== "original" && m.link?.url && !m.link.url.includes("fid=&"));
+      streamUrl = transcoded?.link?.url || origMedia?.link?.url || directUrl;
     }
-    if (!streamUrl && data.web_content_link && !data.web_content_link.includes("fid=&")) {
-      streamUrl = data.web_content_link;
+
+    if (!streamUrl && data.medias && data.medias[0]?.link?.url) {
+      streamUrl = data.medias[0].link.url;
     }
+
     if (streamUrl) {
-      console.log("%c[PikPak Ultra] 🎯 Bắt được stream URL:", LOG_SUCCESS, streamUrl);
       notifyStreamUrl(streamUrl);
     }
+  }
+
+  function isRelevantEndpoint(url) {
+    if (!url) return false;
+    return (
+      url.includes("/share/") ||
+      url.includes("/share") ||
+      url.includes("/file") ||
+      url.includes("/files") ||
+      url.includes("/medias") ||
+      url.includes("/download")
+    );
   }
 
   // Hook window.fetch
@@ -110,13 +172,23 @@
         } catch (_) {}
       }
 
-      const contentType = response.headers.get("content-type") || "";
-      const isJson = contentType.includes("application/json") || contentType.includes("text/json");
-      const isApiEndpoint = url.includes("/drive/v1/") || url.includes("/drive/") || (url.includes("mypikpak") && !url.includes(".ts") && !url.includes(".m3u8") && !url.includes(".mp4"));
-
-      if (isJson && isApiEndpoint) {
-        const clone = response.clone();
-        clone.json().then((data) => processResponseData(data)).catch(() => {});
+      if (isRelevantEndpoint(url)) {
+        const contentType = response.headers.get("content-type") || "";
+        const isJson = contentType.includes("application/json") || contentType.includes("text/json");
+        if (isJson) {
+          const clone = response.clone();
+          const data = await clone.json().catch(() => null);
+          if (data) {
+            processResponseData(data);
+            if (Array.isArray(data.files)) {
+              return new Response(JSON.stringify(data), {
+                status: response.status,
+                statusText: response.statusText,
+                headers: response.headers,
+              });
+            }
+          }
+        }
       }
     } catch (_) {}
 
@@ -132,14 +204,28 @@
 
   const origXHRSend = XMLHttpRequest.prototype.send;
   XMLHttpRequest.prototype.send = function (...args) {
-    this.addEventListener("load", function () {
-      try {
-        const ct = this.getResponseHeader ? (this.getResponseHeader("content-type") || "") : "";
-        if (this._ppUrl && (this._ppUrl.includes("/drive/") || this._ppUrl.includes("mypikpak")) && (!ct || ct.includes("json"))) {
-          const data = JSON.parse(this.responseText);
-          processResponseData(data);
-        }
-      } catch (_) {}
+    this.addEventListener("readystatechange", function () {
+      if (this.readyState === 4 && this._ppUrl && isRelevantEndpoint(this._ppUrl)) {
+        try {
+          const ct = this.getResponseHeader ? (this.getResponseHeader("content-type") || "") : "";
+          if (!ct || ct.includes("json")) {
+            const data = JSON.parse(this.responseText);
+            if (data) {
+              processResponseData(data);
+              if (Array.isArray(data.files)) {
+                const modified = JSON.stringify(data);
+                try {
+                  Object.defineProperty(this, "responseText", { value: modified, configurable: true });
+                  Object.defineProperty(this, "response", {
+                    value: this.responseType === "json" ? data : modified,
+                    configurable: true,
+                  });
+                } catch (_) {}
+              }
+            }
+          }
+        } catch (_) {}
+      }
     });
     return origXHRSend.apply(this, args);
   };

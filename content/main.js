@@ -93,6 +93,166 @@
     return h > 0 ? `${h}:${m}:${r}` : `${m}:${r}`;
   }
 
+  let isModifyingDom = false;
+
+  function sortPlaylist(list) {
+    if (!Array.isArray(list)) return [];
+    return [...list].sort((a, b) => {
+      const isVidA = Boolean(a.isVideo || a.type === "video" || /\.(mp4|mkv|avi|mov|wmv|flv|webm|ts|m4v|3gp|rmvb|iso)/i.test(a.name || ""));
+      const isVidB = Boolean(b.isVideo || b.type === "video" || /\.(mp4|mkv|avi|mov|wmv|flv|webm|ts|m4v|3gp|rmvb|iso)/i.test(b.name || ""));
+      if (isVidA !== isVidB) return isVidA ? -1 : 1; // video first, image second
+
+      // Nếu cả hai đều là video: video dài nhất trước (duration giảm dần)
+      if (isVidA && isVidB) {
+        const durA = parseInt(a.duration || a.params?.duration || a.medias?.[0]?.video?.duration || 0, 10) || 0;
+        const durB = parseInt(b.duration || b.params?.duration || b.medias?.[0]?.video?.duration || 0, 10) || 0;
+        if (durA !== durB) return durB - durA;
+      }
+
+      return (a.name || "").localeCompare(b.name || "", undefined, { numeric: true, sensitivity: "base" });
+    });
+  }
+
+  function parseDurationText(text) {
+    if (!text) return 0;
+    const parts = text.trim().split(":").map((p) => parseInt(p, 10));
+    if (parts.some(isNaN)) return 0;
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    if (parts.length === 1) return parts[0];
+    return 0;
+  }
+
+  function getElementDuration(el) {
+    if (!el) return 0;
+    try {
+      const comp = el.__vueParentComponent || el.__vnode?.ctx;
+      const vItem = comp?.props?.item || comp?.setupState?.item || comp?.data?.item || el.__vue__?.item;
+      const s = parseInt(vItem?.params?.duration || vItem?.medias?.[0]?.video?.duration || 0, 10);
+      if (s > 0) return s;
+    } catch (_) {}
+
+    const badge = el.querySelector(".pp-web-duration-badge");
+    if (badge && badge.textContent) {
+      const s = parseDurationText(badge.textContent);
+      if (s > 0) return s;
+    }
+
+    const nameEl = el.querySelector('.name .ellipsis, .name, [class*="file-name"], [class*="title"]');
+    const rawName = (nameEl?.textContent || el.querySelector('img')?.alt || el.textContent || '').trim().split('\n')[0].trim().toLowerCase();
+    if (rawName && currentPlaylist?.length > 0) {
+      const matched = currentPlaylist.find((v) => v?.name && (rawName.includes(v.name.toLowerCase()) || v.name.toLowerCase().includes(rawName)));
+      if (matched && matched.duration > 0) return matched.duration;
+    }
+
+    return 0;
+  }
+
+  function getElementCategory(el) {
+    if (!el) return 4;
+    // 1. Folder
+    if (
+      el.classList.contains("pp-folder-card") ||
+      el.classList.contains("is-folder") ||
+      el.getAttribute("data-kind") === "drive#folder" ||
+      el.querySelector('.folder-cover, img[src*="folder"], svg[class*="folder"], [class*="folder-icon"], [class*="folder"]')
+    ) {
+      return 1;
+    }
+    let comp = null, vItem = null;
+    try {
+      comp = el.__vueParentComponent || el.__vnode?.ctx;
+      vItem = comp?.props?.item || comp?.setupState?.item || comp?.data?.item || el.__vue__?.item;
+      if (vItem) {
+        if (vItem.kind === "drive#folder") return 1;
+        if (vItem.kind === "drive#video" || vItem.mime_type?.startsWith("video/")) return 2;
+        if (vItem.kind === "drive#image" || vItem.mime_type?.startsWith("image/")) return 3;
+      }
+    } catch (_) {}
+
+    const text = (el.textContent || "").trim();
+    const nameEl = el.querySelector('.name .ellipsis, .name, [class*="file-name"], [class*="title"]');
+    const name = (nameEl?.textContent || el.querySelector('img')?.alt || text).split("\n")[0].trim().toLowerCase();
+
+    // 2. Video
+    if (
+      el.querySelector(".play-icon, [class*='play-icon'], .pp-web-duration-badge") ||
+      /\.(mp4|mkv|avi|mov|wmv|flv|webm|ts|m4v|3gp|rmvb|iso|vob|m2ts)$/i.test(name)
+    ) {
+      return 2;
+    }
+
+    // 3. Image
+    if (/\.(jpe?g|png|webp|gif|bmp|svg|avif|heic|tiff|ico)$/i.test(name)) {
+      return 3;
+    }
+
+    return 4;
+  }
+
+  function sortWebDomFiles() {
+    if (isModifyingDom || window.PikPakPlayer?.isModalOpen) return;
+    const items = document.querySelectorAll('.file-item, .grid.file-item, .file-list-item, .el-table__row');
+    if (items.length < 2) return;
+
+    const parentMap = new Map();
+    items.forEach((item) => {
+      const p = item.parentElement;
+      if (!p) return;
+      if (!parentMap.has(p)) parentMap.set(p, []);
+      parentMap.get(p).push(item);
+    });
+
+    parentMap.forEach((children, parent) => {
+      let needsSort = false;
+      let prevCat = 0;
+      let prevDur = Infinity;
+      for (const child of children) {
+        const cat = getElementCategory(child);
+        const dur = cat === 2 ? getElementDuration(child) : 0;
+        if (cat < prevCat) {
+          needsSort = true;
+          break;
+        }
+        if (cat === 2 && prevCat === 2 && dur > prevDur) {
+          needsSort = true;
+          break;
+        }
+        prevCat = cat;
+        prevDur = dur;
+      }
+
+      if (needsSort) {
+        isModifyingDom = true;
+        try {
+          const sorted = [...children].sort((a, b) => {
+            const catA = getElementCategory(a);
+            const catB = getElementCategory(b);
+            if (catA !== catB) return catA - catB;
+
+            // Nếu cả hai đều là video: video dài nhất trước (duration giảm dần)
+            if (catA === 2) {
+              const durA = getElementDuration(a);
+              const durB = getElementDuration(b);
+              if (durA !== durB) return durB - durA;
+            }
+
+            const nameElA = a.querySelector('.name .ellipsis, .name, [class*="file-name"], [class*="title"]');
+            const nameA = (nameElA?.textContent || a.querySelector('img')?.alt || a.textContent || "").trim();
+            const nameElB = b.querySelector('.name .ellipsis, .name, [class*="file-name"], [class*="title"]');
+            const nameB = (nameElB?.textContent || b.querySelector('img')?.alt || b.textContent || "").trim();
+            return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
+          });
+
+          sorted.forEach((el) => parent.appendChild(el));
+        } catch (_) {
+        } finally {
+          setTimeout(() => { isModifyingDom = false; }, 50);
+        }
+      }
+    });
+  }
+
   function renderDurationBadgesOnWeb() {
     if (window.PikPakPlayer?.isModalOpen) return;
     const items = document.querySelectorAll('.file-item, .grid.file-item, .file-list-item, .el-table__row');
@@ -100,78 +260,80 @@
 
     if (currentPlaylist.length === 0) {
       const net = window.PikPakNetwork ? window.PikPakNetwork.getIntercepted() : {};
-      if (net?.playlist?.length > 0) currentPlaylist = net.playlist;
+      if (net?.playlist?.length > 0) currentPlaylist = sortPlaylist(net.playlist);
     }
 
     const icons = window.PikPakIcons || {};
+    isModifyingDom = true;
 
-    items.forEach((itemEl) => {
-      if (itemEl.dataset.ppProcessed === "1") return;
+    try {
+      items.forEach((itemEl) => {
+        if (itemEl.dataset.ppProcessed === "1") return;
 
-      const thumb = itemEl.querySelector('.thumbnail') || itemEl.querySelector('.file-cover, .thumbnail-wrap, .player-file-cover');
-      if (!thumb) return;
+        const thumb = itemEl.querySelector('.thumbnail') || itemEl.querySelector('.file-cover, .thumbnail-wrap, .player-file-cover');
+        if (!thumb) return;
 
-      const hasDuration = Boolean(thumb.querySelector('.pp-web-duration-badge'));
-      const hasTypeBadge = Boolean(thumb.querySelector('.pp-type-badge'));
-      const fc = thumb.querySelector('.folder-cover');
-      const hasFolderBlur = fc ? Boolean(fc.querySelector('.pp-folder-blur')) : true;
+        const fc = thumb.querySelector('.folder-cover');
+        if (fc) {
+          itemEl.classList.add('pp-folder-card');
+          thumb.classList.add('pp-folder-card');
+        }
 
-      if (hasDuration && hasTypeBadge && hasFolderBlur) {
+        const hasDuration = Boolean(thumb.querySelector('.pp-web-duration-badge'));
+        const hasTypeBadge = Boolean(thumb.querySelector('.pp-type-badge'));
+
+        if (hasDuration && hasTypeBadge) {
+          itemEl.dataset.ppProcessed = "1";
+          return;
+        }
+
+        let durationStr = "", vItem = null;
+        try {
+          const comp = itemEl.__vueParentComponent || itemEl.__vnode?.ctx;
+          vItem = comp?.props?.item || comp?.setupState?.item || comp?.data?.item || itemEl.__vue__?.item;
+          const s = parseInt(vItem?.params?.duration || vItem?.medias?.[0]?.video?.duration || 0, 10);
+          if (s > 0) durationStr = formatDuration(s);
+        } catch (_) {}
+
+        const nameEl = itemEl.querySelector('.name .ellipsis, .name, [class*="file-name"], [class*="title"]');
+        const rawName = (nameEl?.textContent || itemEl.querySelector('img')?.alt || itemEl.textContent || '').trim().split('\n')[0].trim().toLowerCase();
+
+        if (!durationStr && currentPlaylist?.length > 0) {
+          const matched = currentPlaylist.find((v) => v?.name && (rawName.includes(v.name.toLowerCase()) || v.name.toLowerCase().includes(rawName)));
+          durationStr = matched?.durationText || (matched?.duration > 0 ? formatDuration(matched.duration) : "");
+        }
+
+        if (durationStr && !hasDuration) {
+          const badge = document.createElement('span');
+          badge.className = 'pp-web-duration-badge';
+          badge.textContent = durationStr;
+          thumb.appendChild(badge);
+        }
+        if (!hasTypeBadge) {
+          let type = '';
+          if (fc || itemEl.classList.contains('is-folder') || vItem?.kind === 'drive#folder') type = 'folder';
+          else if (durationStr || itemEl.querySelector('.play-icon') || vItem?.kind === 'drive#video' || /\.(mp4|mkv|avi|mov|wmv|flv|webm|ts|m4v|3gp|rmvb|iso)$/i.test(rawName)) type = 'video';
+          else if (vItem?.kind === 'drive#image' || /\.(jpg|jpeg|png|webp|gif|bmp|svg|tiff|avif|heic)$/i.test(rawName)) type = 'image';
+          if (type && icons[type]) {
+            const tb = document.createElement('span');
+            tb.className = `pp-type-badge pp-type-${type}`;
+            tb.title = type === 'folder' ? 'Thư mục' : type === 'video' ? 'Video' : 'Hình ảnh';
+            tb.innerHTML = icons[type];
+            thumb.appendChild(tb);
+          }
+        }
+
         itemEl.dataset.ppProcessed = "1";
-        return;
-      }
-
-      let durationStr = "", vItem = null;
-      try {
-        const comp = itemEl.__vueParentComponent || itemEl.__vnode?.ctx;
-        vItem = comp?.props?.item || comp?.setupState?.item || comp?.data?.item || itemEl.__vue__?.item;
-        const s = parseInt(vItem?.params?.duration || vItem?.medias?.[0]?.video?.duration || 0, 10);
-        if (s > 0) durationStr = formatDuration(s);
-      } catch (_) {}
-
-      const nameEl = itemEl.querySelector('.name .ellipsis, .name, [class*="file-name"], [class*="title"]');
-      const rawName = (nameEl?.textContent || itemEl.querySelector('img')?.alt || itemEl.textContent || '').trim().split('\n')[0].trim().toLowerCase();
-
-      if (!durationStr && currentPlaylist?.length > 0) {
-        const matched = currentPlaylist.find((v) => v?.name && (rawName.includes(v.name.toLowerCase()) || v.name.toLowerCase().includes(rawName)));
-        durationStr = matched?.durationText || (matched?.duration > 0 ? formatDuration(matched.duration) : "");
-      }
-
-      if (durationStr && !hasDuration) {
-        const badge = document.createElement('span');
-        badge.className = 'pp-web-duration-badge';
-        badge.textContent = durationStr;
-        thumb.appendChild(badge);
-      }
-      if (!hasTypeBadge) {
-        let type = '';
-        if (fc || itemEl.classList.contains('is-folder') || vItem?.kind === 'drive#folder') type = 'folder';
-        else if (durationStr || itemEl.querySelector('.play-icon') || vItem?.kind === 'drive#video' || /\.(mp4|mkv|avi|mov|wmv|flv|webm|ts|m4v|3gp|rmvb|iso)$/i.test(rawName)) type = 'video';
-        else if (vItem?.kind === 'drive#image' || /\.(jpg|jpeg|png|webp|gif|bmp|svg|tiff|avif|heic)$/i.test(rawName)) type = 'image';
-        if (type && icons[type]) {
-          const tb = document.createElement('span');
-          tb.className = `pp-type-badge pp-type-${type}`;
-          tb.title = type === 'folder' ? 'Thư mục' : type === 'video' ? 'Video' : 'Hình ảnh';
-          tb.innerHTML = icons[type];
-          thumb.appendChild(tb);
-        }
-      }
-      if (fc && !fc.querySelector('.pp-folder-blur')) {
-        const fImg = fc.querySelector('img');
-        if (fImg?.src) {
-          const b = document.createElement('div');
-          b.className = 'pp-folder-blur';
-          b.style.backgroundImage = `url("${fImg.src}")`;
-          fc.prepend(b);
-        }
-      }
-
-      itemEl.dataset.ppProcessed = "1";
-    });
+      });
+    } finally {
+      setTimeout(() => {
+        isModifyingDom = false;
+      }, 50);
+    }
   }
 
   function harvestPikPakThumbnails() {
-    if (window.PikPakPlayer?.isModalOpen) return;
+    if (window.PikPakPlayer?.isModalOpen || !currentPlaylist || currentPlaylist.length === 0) return;
     document.querySelectorAll("#manager-preview-bar .player-file-cover, .file-list-box .file-list-item").forEach((el, idx) => {
       const src = el.querySelector("img")?.src;
       if (src && currentPlaylist[idx] && (!currentPlaylist[idx].thumbnailLink || currentPlaylist[idx].thumbnailLink.length < 5)) currentPlaylist[idx].thumbnailLink = src;
@@ -180,24 +342,24 @@
 
   let observerThrottleTimer = null;
   function handleDomMutations() {
+    if (isModifyingDom) return;
     suppressModals();
     if (!window.PikPakPlayer?.isModalOpen) {
+      sortWebDomFiles();
       harvestPikPakThumbnails();
       renderDurationBadgesOnWeb();
       checkAndAutoUnlock();
     } else {
-      document.querySelectorAll(BG_VIDEO_SELECTOR).forEach((v) => {
-        try { if (!v.paused) v.pause(); v.muted = true; v.volume = 0; } catch (_) {}
-      });
+      window.PikPakPlayer?.purgeUnusedMediaAndLayers?.();
     }
   }
 
   const modalObserver = new MutationObserver(() => {
-    if (observerThrottleTimer) return;
+    if (isModifyingDom || observerThrottleTimer) return;
     observerThrottleTimer = setTimeout(() => {
       observerThrottleTimer = null;
-      handleDomMutations();
-    }, 150);
+      requestAnimationFrame(() => handleDomMutations());
+    }, 300);
   });
   modalObserver.observe(document.documentElement, { childList: true, subtree: true });
 
@@ -234,6 +396,9 @@
         fileName,
         playlist: currentPlaylist,
         currentIndex: currentVideoIndex,
+        onPrev: () => playPrevMedia(),
+        onNext: () => playNextMedia(),
+        onSelect: (idx) => playMediaByIndex(idx),
         onDownload: () => handleDownloadClick(imgUrl, fileName),
       });
     } catch (err) { showToast("Lỗi nạp ảnh: " + err.message, true); }
@@ -278,6 +443,8 @@
   // ====== 8. Auto-Unlock Watcher ======
   async function checkAndAutoUnlock() {
     if (window.PikPakPlayer?.isModalOpen || isAutoUnlocking) return;
+    const { shareId } = getShareContext();
+    if (!shareId) return; // Chỉ auto-unlock khi đang duyệt link chia sẻ công khai
     const currentVideo = document.querySelector(BG_VIDEO_SELECTOR);
     if (!currentVideo || currentVideo.dataset.ppUnlocked === "true" || currentVideo.dataset.ppUnlocked === "failed") return;
     isAutoUnlocking = true;
@@ -315,23 +482,43 @@
 
   function applyDirectStream(url, meta = {}) {
     if (!url) return;
-    if (window.PikPakPlayer?.isModalOpen && window.PikPakPlayer?.currentStreamUrl === url) {
+    const allStreams = meta.streams || activeStreamData?.streams || [];
+    const mediaName = meta.fileName || activeStreamData?.fileName || "";
+    const isAviOrNonNative = /\.(avi|wmv|flv|rmvb|rm|asf|divx|vob|ts|m2ts|3gp)(\?|$)/i.test(url) ||
+      /\.(avi|wmv|flv|rmvb|rm|asf|divx|vob|ts|m2ts|3gp)$/i.test(mediaName);
+
+    let effectiveUrl = url;
+    if (isAviOrNonNative && allStreams.length > 0) {
+      const transcoded = allStreams.find((s) => !s.isOriginal && s.url && !s.url.includes("fid=&"));
+      if (transcoded?.url) {
+        effectiveUrl = transcoded.url;
+      }
+    } else if (allStreams.length > 0) {
+      // Video thông thường: LUÔN DÙNG BẢN GỐC (Original) để đảm bảo 100% phát mượt mà
+      const origStream = allStreams.find((s) => s.isOriginal && s.url && !s.url.includes("fid=&"));
+      if (origStream?.url) {
+        effectiveUrl = origStream.url;
+      }
+    }
+
+    if (window.PikPakPlayer?.isModalOpen && window.PikPakPlayer?.currentStreamUrl === effectiveUrl) {
       return;
     }
     isUnlocked = true;
-    console.log("%c[PikPak Ultra] 📺 Khởi chạy Cinema Modal Player:", LOG_SUCCESS, { url, meta });
+    console.log("%c[PikPak Ultra] 📺 Khởi chạy Cinema Modal Player:", LOG_SUCCESS, { url: effectiveUrl, meta });
 
-    // Dập tắt triệt để video gốc ở nền
-    document.querySelectorAll(BG_VIDEO_SELECTOR).forEach((v) => {
-      try { v.pause(); v.muted = true; v.volume = 0; v.style.display = "none"; v.onplay = () => { if (window.PikPakPlayer?.isModalOpen) { v.pause(); v.muted = true; v.volume = 0; } }; } catch (_) {}
-    });
+    // Dập tắt và xóa sổ triệt để mọi video và layer thừa ở nền
+    window.PikPakPlayer?.purgeUnusedMediaAndLayers?.();
 
-    window.PikPakPlayer?.openCinemaModal(url, {
+    window.PikPakPlayer?.openCinemaModal(effectiveUrl, {
       fileName: meta.fileName || activeStreamData?.fileName || "PikPak Video Stream",
       fileSize: meta.fileSize || activeStreamData?.fileSize || 0,
       playlist: meta.playlist || currentPlaylist,
       currentIndex: meta.currentIndex !== undefined ? meta.currentIndex : currentVideoIndex,
-      streams: activeStreamData?.streams || [],
+      streams: allStreams,
+      onPrev: () => playPrevMedia(),
+      onNext: () => playNextMedia(),
+      onSelect: (idx) => playMediaByIndex(idx),
       onDownload: () => handleDownloadClick(),
       onRefreshRequest: () => {
         if (currentShareId && activeStreamData?.fileId) {
@@ -367,19 +554,89 @@
   }
 
   // ====== 10. Instant Media (Video & Image) Click Interceptor ======
+  let lastMediaClickTime = 0;
+  let activeOpeningMediaKey = null;
+
   function handleFileItemClick(e) {
     const itemEl = e.target.closest('.file-list-item, [class*="file-item"], [class*="file_item"], .el-table__row, [class*="grid-item"], [class*="card-item"]');
     if (!itemEl || e.target.closest('input, .el-checkbox, [class*="checkbox"], [class*="more-btn"], [class*="action-btn"], [class*="download"]')) return;
 
-    // 1. Phân biệt thư mục: Tuyệt đối không can thiệp khi bấm vào thư mục
-    if (itemEl.querySelector('img[src*="folder"], svg[class*="folder"], [class*="folder-icon"], [class*="folder"]') || itemEl.classList.contains("is-folder") || itemEl.getAttribute("data-kind") === "drive#folder") return;
-
-    let vItem = null;
+    // 1. Phân biệt thư mục: Mở thư mục ngay lập tức chỉ với 1 click
+    let comp = null, vItem = null;
     try {
-      const comp = itemEl.__vueParentComponent || itemEl.__vnode?.ctx;
+      comp = itemEl.__vueParentComponent || itemEl.__vnode?.ctx;
       vItem = comp?.props?.item || comp?.setupState?.item || comp?.data?.item || itemEl.__vue__?.item;
     } catch (_) {}
-    if (vItem?.kind === "drive#folder") return;
+
+    const isFolder = Boolean(
+      vItem?.kind === "drive#folder" ||
+      itemEl.classList.contains("pp-folder-card") ||
+      itemEl.classList.contains("is-folder") ||
+      itemEl.getAttribute("data-kind") === "drive#folder" ||
+      itemEl.querySelector('.folder-cover, img[src*="folder"], svg[class*="folder"], [class*="folder-icon"], [class*="folder"]')
+    );
+
+    if (isFolder) {
+      if (e._ppSynthesized) return;
+      if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      if (e.target.closest('input, .el-checkbox, [class*="checkbox"], [class*="more-btn"], [class*="action-btn"], [class*="download"], .grid-operation, .el-dropdown')) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
+      const targetEl = e.target || itemEl;
+
+      // Thử gọi hàm mở folder trực tiếp từ Vue component nếu có
+      try {
+        if (comp) {
+          const itemData = vItem || comp.props?.item;
+          const methods = [
+            comp.setupState?.openFolder,
+            comp.setupState?.handleOpen,
+            comp.setupState?.handleDblclick,
+            comp.setupState?.onItemDblclick,
+            comp.setupState?.onDblclick,
+            comp.setupState?.openItem,
+            comp.ctx?.handleDblclick,
+            comp.ctx?.openFolder,
+            comp.ctx?.openItem,
+          ];
+          for (const fn of methods) {
+            if (typeof fn === "function") {
+              fn(itemData);
+              break;
+            }
+          }
+        }
+      } catch (_) {}
+
+      // Kích hoạt dblclick để Vue/PikPak mở thư mục ngay lập tức
+      const dblClickEvent = new MouseEvent("dblclick", {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+        detail: 2,
+      });
+      dblClickEvent._ppSynthesized = true;
+
+      targetEl.dispatchEvent(dblClickEvent);
+      if (targetEl !== itemEl) {
+        itemEl.dispatchEvent(dblClickEvent);
+      }
+
+      // Kích hoạt click thứ 2 với detail = 2 đề phòng PikPak kiểm tra click detail
+      const secondClickEvent = new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+        detail: 2,
+      });
+      secondClickEvent._ppSynthesized = true;
+      targetEl.dispatchEvent(secondClickEvent);
+
+      return;
+    }
 
     const itemText = (itemEl.textContent || "").trim();
     const isVideoExt = /\.(mp4|mkv|avi|mov|wmv|flv|webm|ts|m4v|3gp|rmvb|iso)/i.test(itemText);
@@ -404,6 +661,15 @@
     const mediaName = matchedMedia ? matchedMedia.name : (vItem?.name || itemText.split("\n")[0] || (isImage ? "Hình ảnh" : "Video"));
     const playIdx = matchedIdx !== -1 ? matchedIdx : 0;
     const targetFileId = matchedMedia?.id || vItem?.id;
+
+    // Chặn double-click hoặc nhấn liên tiếp quá nhanh vào cùng 1 media (tránh mở 2 layer)
+    const mediaKey = targetFileId || mediaName;
+    const now = Date.now();
+    if (activeOpeningMediaKey === mediaKey && (now - lastMediaClickTime) < 500) {
+      return;
+    }
+    lastMediaClickTime = now;
+    activeOpeningMediaKey = mediaKey;
 
     if (window.PikPakPlayer?.showInstantLoading) {
       window.PikPakPlayer.showInstantLoading(mediaName, playIdx, currentPlaylist, {
@@ -433,13 +699,64 @@
         if (net.streamUrl) applyDirectStream(net.streamUrl);
         else sendToExtension("RESOLVE_SHARE", { shareId }).then((res) => {
           const list = res?.mediaFiles || res?.videos || [];
-          if (list.length > 0) { currentPlaylist = list; harvestPikPakThumbnails(); loadAndPlayFile(shareId, list[0].id); }
+          if (list.length > 0) { currentPlaylist = sortPlaylist(list); harvestPikPakThumbnails(); loadAndPlayFile(shareId, currentPlaylist[0].id); }
         }).catch((err) => showToast("Lỗi mở media: " + err.message, true));
       }
     }
   }
 
   document.addEventListener("click", handleFileItemClick, true);
+
+  // Chặn dblclick trên file media để PikPak native player KHÔNG BAO GIỜ mở thêm layer thứ 2
+  function handleFileItemDblClick(e) {
+    const itemEl = e.target.closest('.file-list-item, [class*="file-item"], [class*="file_item"], .el-table__row, [class*="grid-item"], [class*="card-item"]');
+    if (!itemEl) return;
+    if (e.target.closest('input, .el-checkbox, [class*="checkbox"], [class*="more-btn"], [class*="action-btn"], [class*="download"]')) return;
+
+    // Phân biệt thư mục: Thư mục cần dblclick để mở nên không được chặn
+    let comp = null, vItem = null;
+    try {
+      comp = itemEl.__vueParentComponent || itemEl.__vnode?.ctx;
+      vItem = comp?.props?.item || comp?.setupState?.item || comp?.data?.item || itemEl.__vue__?.item;
+    } catch (_) {}
+
+    const isFolder = Boolean(
+      vItem?.kind === "drive#folder" ||
+      itemEl.classList.contains("pp-folder-card") ||
+      itemEl.classList.contains("is-folder") ||
+      itemEl.getAttribute("data-kind") === "drive#folder" ||
+      itemEl.querySelector('.folder-cover, img[src*="folder"], svg[class*="folder"], [class*="folder-icon"], [class*="folder"]')
+    );
+    if (isFolder) return;
+
+    // Ngăn chặn sự kiện dblclick phát tán đến Vue component của PikPak
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+  }
+
+  document.addEventListener("dblclick", handleFileItemDblClick, true);
+
+  // Đóng video khi người dùng bấm nút Quay lại / Breadcrumb trên giao diện PikPak web
+  document.addEventListener("click", (e) => {
+    if (window.PikPakPlayer?.isModalOpen) {
+      const isNavBack = e.target.closest(
+        '.breadcrumb, [class*="breadcrumb"], .back-btn, [class*="nav-back"], [class*="nav_back"], .router-link, [class*="back_button"], [class*="header_back"]'
+      );
+      if (isNavBack && !e.target.closest('#pikpak-ultra-cinema-modal')) {
+        console.log("[PikPak Ultra] 🔙 Phát hiện click nút Back/Breadcrumb trên web -> Đang tắt video...");
+        window.PikPakPlayer.closeCinemaModal(false);
+      }
+    }
+  }, true);
+
+  // Lắng nghe popstate từ window để đảm bảo modal luôn tắt khi back
+  window.addEventListener("popstate", () => {
+    if (window.PikPakPlayer?.isModalOpen) {
+      console.log("[PikPak Ultra] 🔙 popstate detected in main.js -> Đang tắt video player...");
+      window.PikPakPlayer.closeCinemaModal(false);
+    }
+  });
 
   let lastPrefetchedKey = "";
   let isPrefetching = false;
@@ -452,7 +769,7 @@
     const netPlaylist = window.PikPakNetwork?.getIntercepted()?.playlist;
     if (netPlaylist?.length > 0) {
       if (currentPlaylist.length === 0) {
-        currentPlaylist = netPlaylist;
+        currentPlaylist = sortPlaylist(netPlaylist);
         harvestPikPakThumbnails();
         updateControls();
       }
@@ -473,7 +790,7 @@
         } catch (_) {}
       }
       if (res?.mediaFiles?.length > 0 || res?.videos?.length > 0) {
-        currentPlaylist = res.mediaFiles || res.videos;
+        currentPlaylist = sortPlaylist(res.mediaFiles || res.videos);
         resolvedShareData = res;
         const targetId = res.targetFileId || fileId;
         if (targetId && currentPlaylist.length > 0) {
@@ -501,6 +818,10 @@
     const hrefChanged = currentHref !== lastCheckedHref;
     if (hrefChanged) {
       lastCheckedHref = currentHref;
+      if (window.PikPakPlayer?.isModalOpen) {
+        console.log("[PikPak Ultra] 🔙 Phát hiện URL thay đổi (SPA navigation / Back) -> Tự động đóng video!");
+        window.PikPakPlayer.closeCinemaModal(false);
+      }
       document.querySelectorAll('[data-pp-processed]').forEach((el) => {
         delete el.dataset.ppProcessed;
       });
@@ -541,7 +862,7 @@
     });
     window.PikPakNetwork.onPlaylist((videos) => {
       if (videos?.length > 0) {
-        currentPlaylist = videos;
+        currentPlaylist = sortPlaylist(videos);
         harvestPikPakThumbnails();
         updateControls();
       }

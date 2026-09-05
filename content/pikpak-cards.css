@@ -14,13 +14,17 @@
 
 /* ── 2. Thu gọn chiều cao container ngoài cùng của card folder ──────── */
 .file-item:has(.folder-cover),
-.grid.file-item:has(.folder-cover) {
+.grid.file-item:has(.folder-cover),
+.file-item.pp-folder-card,
+.grid.file-item.pp-folder-card {
   height: auto !important;
   min-height: 0 !important;
+  cursor: pointer !important;
 }
 
 /* ── 3. Thu gọn thumbnail-wrap về tỉ lệ chuẩn 16:9 gọn gàng ─────────── */
-.thumbnail-wrap:has(.folder-cover) {
+.thumbnail-wrap:has(.folder-cover),
+.thumbnail-wrap.pp-folder-card {
   position: relative !important;
   width: 100% !important;
   height: auto !important;
@@ -30,13 +34,12 @@
   margin: 0 !important;
   overflow: hidden !important;
   border-radius: var(--pp-radius-sm, 8px) !important;
-  background: radial-gradient(ellipse at center, rgba(30, 36, 50, 0.7) 0%, rgba(8, 10, 15, 0.95) 100%) !important;
-  backdrop-filter: blur(16px) !important;
-  -webkit-backdrop-filter: blur(16px) !important;
+  background: #0d1017 !important;
 }
 
 /* ── 4. Thumbnail & folder-cover chiếm trọn 100% khung 16:9 ────────── */
-.thumbnail:has(.folder-cover) {
+.thumbnail:has(.folder-cover),
+.thumbnail.pp-folder-card {
   position: absolute !important;
   inset: 0 !important;
   width: 100% !important;
@@ -48,6 +51,7 @@
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
+  background: #0d1017 !important;
 }
 
 .folder-cover {
@@ -66,27 +70,9 @@
   background-color: transparent !important;
 }
 
-/* Gradient blur background cho phần dư hai bên của thumbnail ảnh */
+/* Đã loại bỏ hoàn toàn các lớp blur và vignette dư thừa nhằm tối ưu 100% GPU */
 .pp-folder-blur {
-  position: absolute !important;
-  inset: -20px !important;
-  background-size: cover !important;
-  background-position: center !important;
-  filter: blur(28px) brightness(0.65) saturate(1.4) !important;
-  transform: scale(1.15) !important;
-  pointer-events: none !important;
-  z-index: 1 !important;
-  opacity: 0.92 !important;
-}
-
-/* Lớp phủ gradient vignette tạo chiều sâu và làm dịu phần viền */
-.folder-cover::before {
-  content: "" !important;
-  position: absolute !important;
-  inset: 0 !important;
-  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.1) 0%, rgba(6, 8, 14, 0.75) 100%) !important;
-  z-index: 2 !important;
-  pointer-events: none !important;
+  display: none !important;
 }
 
 /* ── 5. Khung chứa .cover & el-image chiếm trọn diện tích ───────────── */
@@ -138,7 +124,8 @@
 }
 
 /* ── 7. Nút checkbox & 3-chấm nằm đè lên góc trên ảnh (như card video) ── */
-.thumbnail-wrap:has(.folder-cover) .grid-operation {
+.thumbnail-wrap:has(.folder-cover) .grid-operation,
+.thumbnail-wrap.pp-folder-card .grid-operation {
   position: absolute !important;
   top: 6px !important;
   left: 6px !important;
@@ -176,9 +163,7 @@
   width: 22px !important;
   height: 22px !important;
   border-radius: var(--pp-radius-sm, 8px) !important;
-  background: var(--pp-glass-bg, rgba(18, 20, 26, 0.65)) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
+  background: rgba(18, 20, 26, 0.92) !important;
   color: var(--pp-icon-color, rgba(255, 255, 255, 0.88)) !important;
   border: 1px solid var(--pp-glass-border, rgba(255, 255, 255, 0.12)) !important;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45) !important;
@@ -198,15 +183,37 @@
 /* Hover effect tuân thủ design system tokens */
 .thumbnail:hover .pp-type-badge,
 .thumbnail-wrap:hover .pp-type-badge {
-  background: var(--pp-glass-hover, rgba(26, 30, 40, 0.85)) !important;
+  background: rgba(26, 30, 40, 0.96) !important;
   border-color: var(--pp-glass-border-hover, rgba(255, 255, 255, 0.24)) !important;
   color: var(--pp-icon-hover, #ffffff) !important;
 }
 
-/* ── 11. Gradient blur nâng cao cho card video của PikPak ──────────── */
+/* ── 11. Ẩn hoàn toàn blur video mặc định của PikPak để tối ưu GPU ──── */
 .thumbnail .file-cover .blur {
-  filter: blur(24px) brightness(0.65) saturate(1.35) !important;
-  transform: scale(1.15) !important;
-  opacity: 0.92 !important;
+  display: none !important;
+  filter: none !important;
 }
+
+/* ── 12. Sắp xếp thứ tự mặc định: Folder trước, Video sau, Ảnh sau cùng ──── */
+.file-item.pp-folder-card,
+.grid.file-item.pp-folder-card,
+.file-item:has(.folder-cover),
+.file-item:has([class*="folder"]),
+.el-table__row:has([class*="folder"]) {
+  order: 1 !important;
+}
+
+.file-item:has(.play-icon),
+.file-item:has(.pp-web-duration-badge),
+.file-item:has(.pp-type-video),
+.el-table__row:has(.play-icon),
+.el-table__row:has(.pp-type-video) {
+  order: 2 !important;
+}
+
+.file-item:has(.pp-type-image),
+.el-table__row:has(.pp-type-image) {
+  order: 3 !important;
+}
+
 

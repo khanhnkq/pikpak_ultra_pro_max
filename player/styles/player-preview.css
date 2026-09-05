@@ -50,9 +50,7 @@
 .pp-scrub-preview-time {
   margin-top: 5px;
   padding: 2px 8px;
-  background: rgba(10, 14, 23, 0.92);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(10, 14, 23, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 5px;
   color: #ffffff;
@@ -71,9 +69,7 @@
   transform: translateX(-50%) translateY(-8px) scale(0.92);
   opacity: 0;
   pointer-events: none;
-  background: var(--pp-accent-subtle) !important;
-  backdrop-filter: blur(16px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
+  background: rgba(10, 16, 28, 0.92) !important;
   border: 1px solid var(--pp-accent-border) !important;
   box-shadow: 0 4px 20px var(--pp-accent-glow) !important;
   border-radius: 9999px;
@@ -88,47 +84,14 @@
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.6px;
-  line-height: 1;
   text-transform: uppercase;
-  z-index: 60;
-  white-space: nowrap;
-  box-sizing: border-box;
-  transition: opacity 0.18s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 10000;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .pp-speed-boost-banner.show {
   opacity: 1;
   transform: translateX(-50%) translateY(0) scale(1);
-}
-
-.pp-boost-icon,
-.pp-boost-label,
-.pp-boost-arrows {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-}
-
-.pp-boost-icon svg,
-.pp-boost-arrows svg {
-  width: 14px;
-  height: 14px;
-  display: block;
-}
-
-.pp-boost-icon {
-  animation: ppBoostPulse 1s infinite alternate;
-}
-
-.pp-boost-arrows {
-  color: var(--pp-accent);
-  animation: ppBoostShift 0.8s infinite ease-in-out;
-}
-
-@keyframes ppBoostPulse {
-  0% { transform: scale(1); opacity: 0.8; }
-  100% { transform: scale(1.2); opacity: 1; }
 }
 
 @keyframes ppBoostShift {
@@ -143,9 +106,7 @@
   top: 24px;
   left: 50%;
   transform: translateX(-50%) translateY(-14px) scale(0.94);
-  background: rgba(10, 14, 26, 0.38) !important;
-  backdrop-filter: blur(16px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
+  background: rgba(10, 14, 26, 0.94) !important;
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
   box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35) !important;
   color: #ffffff;

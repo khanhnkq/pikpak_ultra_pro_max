@@ -111,6 +111,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     videoCountBadge.textContent = `${videos.length} video`;
     resultsSection.style.display = "block";
 
+    const SVG_ICONS = {
+      play: `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"/></svg>`,
+      download: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
+      copy: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
+      check: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+    };
+
     videos.forEach((video) => {
       const card = document.createElement("div");
       card.className = "video-card";
@@ -122,13 +129,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         </div>
         <div class="video-actions">
           <button class="mini-btn play" data-action="stream" title="Phát trực tiếp">
-            ▶ Phát
+            ${SVG_ICONS.play} <span>Phát</span>
           </button>
           <button class="mini-btn" data-action="download" title="Tải file gốc">
-            💾
+            ${SVG_ICONS.download}
           </button>
           <button class="mini-btn" data-action="copy" title="Copy Direct Stream URL">
-            🔗
+            ${SVG_ICONS.copy}
           </button>
         </div>
       `;
@@ -140,7 +147,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       streamBtn.addEventListener("click", async () => {
         streamBtn.disabled = true;
-        streamBtn.textContent = "⏳...";
+        streamBtn.innerHTML = "<span>Đang mở...</span>";
 
         try {
           const res = await chrome.runtime.sendMessage({
@@ -158,12 +165,12 @@ document.addEventListener("DOMContentLoaded", async () => {
           alert("Lỗi: " + e.message);
         } finally {
           streamBtn.disabled = false;
-          streamBtn.textContent = "▶ Phát";
+          streamBtn.innerHTML = `${SVG_ICONS.play} <span>Phát</span>`;
         }
       });
 
       downloadBtn.addEventListener("click", async () => {
-        downloadBtn.textContent = "⏳";
+        downloadBtn.innerHTML = "...";
         try {
           const res = await chrome.runtime.sendMessage({
             type: "GET_STREAM_URL",
@@ -174,11 +181,11 @@ document.addEventListener("DOMContentLoaded", async () => {
             chrome.tabs.create({ url: res.data.primaryUrl });
           }
         } catch (_) {}
-        downloadBtn.textContent = "💾";
+        downloadBtn.innerHTML = SVG_ICONS.download;
       });
 
       copyBtn.addEventListener("click", async () => {
-        copyBtn.textContent = "⏳";
+        copyBtn.innerHTML = "...";
         try {
           const res = await chrome.runtime.sendMessage({
             type: "GET_STREAM_URL",
@@ -187,13 +194,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
           if (res.success && res.data?.primaryUrl) {
             await navigator.clipboard.writeText(res.data.primaryUrl);
-            copyBtn.textContent = "✓";
+            copyBtn.innerHTML = SVG_ICONS.check;
             setTimeout(() => {
-              copyBtn.textContent = "🔗";
+              copyBtn.innerHTML = SVG_ICONS.copy;
             }, 2000);
           }
         } catch (_) {
-          copyBtn.textContent = "🔗";
+          copyBtn.innerHTML = SVG_ICONS.copy;
         }
       });
 

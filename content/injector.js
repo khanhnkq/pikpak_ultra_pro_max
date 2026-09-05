@@ -20,7 +20,7 @@
     });
   }
 
-  // Inject modular player and content scripts in dependency order into page execution context
+  // Inject modular player and content scripts in dependency order with parallel downloading (async = false)
   function injectScripts() {
     const scripts = [
       "content/network-interceptor.js",
@@ -30,23 +30,22 @@
       "player/player-preview.js",
       "player/player-template.js",
       "player/player-image.js",
+      "player/player-buffer.js",
       "player/player.js",
       "content/main.js",
     ];
 
-    function loadNext(idx) {
-      if (idx >= scripts.length) return;
+    const target = document.head || document.documentElement;
+    scripts.forEach((path) => {
       const scriptEl = document.createElement("script");
-      scriptEl.src = chrome.runtime.getURL(scripts[idx]);
+      scriptEl.src = chrome.runtime.getURL(path);
       scriptEl.type = "text/javascript";
+      scriptEl.async = false; // Tải song song nhưng thực thi đúng thứ tự dependency
       scriptEl.onload = function () {
         scriptEl.remove();
-        loadNext(idx + 1);
       };
-      (document.head || document.documentElement).appendChild(scriptEl);
-    }
-
-    loadNext(0);
+      target.appendChild(scriptEl);
+    });
   }
 
   // Listen for messages from main.js (Page context)

@@ -58,6 +58,7 @@
         "player/player-preview.js",
         "player/player-template.js",
         "player/player-image.js",
+        "player/player-buffer.js",
         "player/player.js",
         "content/network-interceptor.js",
         "content/main.js",
