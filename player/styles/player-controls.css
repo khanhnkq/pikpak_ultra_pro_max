@@ -51,33 +51,19 @@ html.pp-cinema-active {
   visibility: visible !important;
 }
 
-/* Top-Left Video Title & Episode Badge */
+/* Top-Left Episode Badge */
 .pp-modal-top-info {
   position: absolute; top: 16px; left: 20px; z-index: 2147483645;
-  display: flex; align-items: center; gap: 8px; padding: 4px 14px 4px 6px;
-  background: rgba(14, 18, 26, 0.94);
-  border: 1px solid var(--pp-glass-border); border-radius: var(--pp-radius-pill);
-  color: var(--pp-text-primary); font-size: 13px; font-weight: 600; max-width: 50vw;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: none; pointer-events: auto;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45); transition: opacity 0.3s ease, transform 0.3s ease;
-}
-.pp-top-back-btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
-  padding: 4px 10px 4px 8px; height: 28px;
-  background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--pp-radius-pill); color: #ffffff; font-size: 12px; font-weight: 600;
-  cursor: pointer; outline: none; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  white-space: nowrap; font-family: inherit;
-}
-.pp-top-back-btn:hover {
-  background: #0a84ff; border-color: #0a84ff; color: #ffffff;
-  transform: translateX(-2px); box-shadow: 0 2px 10px rgba(10, 132, 255, 0.4);
+  display: flex; align-items: center; pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s ease;
 }
 .pp-modal-counter {
-  display: inline-flex; align-items: center; padding: 2px 8px; background: var(--pp-accent-subtle);
-  border: 1px solid var(--pp-accent-border); border-radius: 12px; font-size: 11px; font-weight: 700; color: var(--pp-accent); white-space: nowrap;
+  display: inline-flex; align-items: center; padding: 4px 10px;
+  background: rgba(14, 18, 26, 0.94);
+  border: 1px solid var(--pp-glass-border); border-radius: var(--pp-radius-pill);
+  font-size: 12px; font-weight: 700; color: var(--pp-accent); white-space: nowrap;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
 }
-.pp-modal-title { font-size: 13px; font-weight: 600; color: var(--pp-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
 
 /* Top-Right Video Action Group (Download & Close) */
 .pp-modal-top-actions {

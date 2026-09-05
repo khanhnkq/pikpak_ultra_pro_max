@@ -27,7 +27,7 @@
       // NOTE: Do NOT set crossOrigin="anonymous" — PikPak stream URLs use
       // auth tokens and don't send CORS headers, so anonymous mode blocks loading.
       this.previewVideo.muted = true;
-      this.previewVideo.preload = "auto";
+      this.previewVideo.preload = "none";
 
       const onReady = () => {
         this._ready = true;
@@ -62,9 +62,7 @@
       this.isSeeking = false;
       this.pendingTime = null;
       this.currentStreamUrl = streamUrl;
-      this.previewVideo.muted = true;
-      this.previewVideo.src = streamUrl;
-      this.previewVideo.load();
+      // Trì hoãn nạp src đến khi hover để không chiếm băng thông và số lượng kết nối CDN
     }
 
     _doSeek(time) {
@@ -84,8 +82,15 @@
       // Auto-grab source from main player if setSource was not yet called
       if (!this.currentStreamUrl) {
         const src = this.player?.modalVideo?.currentSrc || this.player?.currentStreamUrl;
-        if (src) this.setSource(src);
+        if (src) this.currentStreamUrl = src;
         else return; // no source yet, nothing to show
+      }
+
+      // Lazy load preview video on first hover
+      if (this.previewVideo && this.previewVideo.src !== this.currentStreamUrl) {
+        this.previewVideo.preload = "metadata";
+        this.previewVideo.src = this.currentStreamUrl;
+        this.previewVideo.load();
       }
 
       const targetTime = Math.max(0, Math.min(duration * 0.9999, pos * duration));

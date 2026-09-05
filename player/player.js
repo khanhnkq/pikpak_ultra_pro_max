@@ -367,29 +367,38 @@
       v.addEventListener("ended", () => this.navigationHandlers?.onNext?.());
       let retryCount = 0, lastErrorTime = 0;
       v.addEventListener("error", () => {
-        if (!v.error || v.error.code === 1 || !v.src || !this.isModalOpen) return;
-        const now = Date.now(); if (now - lastErrorTime < 1500) return;
+        if (!v.error || v.error.code === 1 || !this.isModalOpen) return;
+        const now = Date.now(); if (now - lastErrorTime < 2000) return;
         lastErrorTime = now;
         console.warn(`[PikPak Cinema] Video error (code ${v.error.code}, message: ${v.error.message || "none"})`);
+
+        // Tự động tải lại luồng hiện tại nếu gặp gián đoạn tạm thời
+        if (retryCount < 2 && this.currentStreamUrl) {
+          retryCount++;
+          console.log(`[PikPak Cinema] 🔄 Đang tự động kết nối lại luồng video (${retryCount}/2)...`);
+          const savePos = v.currentTime || 0;
+          v.src = this.currentStreamUrl;
+          v.load();
+          if (savePos > 0) {
+            const onMeta = () => {
+              v.removeEventListener("loadedmetadata", onMeta);
+              try { v.currentTime = savePos; } catch (_) {}
+              v.play().catch(() => {});
+            };
+            v.addEventListener("loadedmetadata", onMeta);
+          } else {
+            v.play().catch(() => {});
+          }
+          return;
+        }
 
         if (!this.failedStreamUrls) this.failedStreamUrls = new Set();
         if (v.src) this.failedStreamUrls.add(v.src);
         if (this.currentStreamUrl) this.failedStreamUrls.add(this.currentStreamUrl);
 
-        // Check if there is an alternative playable stream in streams list (prefer Original)
-        const streams = this.currentOptions?.streams || [];
-        const origFallback = streams.find((s) => s.isOriginal && s.url && !this.failedStreamUrls.has(s.url) && !s.url.includes("fid=&"));
-        const altStream = origFallback || streams.find((s) => s.url && !this.failedStreamUrls.has(s.url) && !s.url.includes("fid=&"));
-        if (altStream) {
-          console.log(`[PikPak Cinema] 🔄 Tự động chuyển sang luồng dự phòng: ${altStream.quality} (${altStream.resolution})`);
-          this.shortcuts?.showHud(`Chuyển sang ${altStream.quality}`, 3000);
-          this.changeSource(altStream.url, false);
-          return;
-        }
-
-        if (retryCount < 1 && this.refreshCallback) {
-          retryCount++;
-          console.log(`[PikPak Cinema] Attempting stream refresh (retry ${retryCount}/1)...`);
+        // Nếu có callback refresh token, yêu cầu background làm mới link trước khi từ bỏ
+        if (this.refreshCallback) {
+          console.log("[PikPak Cinema] Yêu cầu cấp mới token stream từ PikPak API...");
           this.refreshCallback();
           return;
         }
@@ -422,16 +431,18 @@
       if (spinnerText) spinnerText.textContent = title ? `Đang mở: ${title}` : "Đang nạp luồng phát...";
       if (spinner) spinner.classList.add("show");
 
-      if (playlist?.length > 0) {
+      if (playlist?.length > 1) {
         if (counterEl) {
           counterEl.textContent = `${index + 1} / ${playlist.length}`;
           counterEl.style.display = "inline-flex";
         }
         document.getElementById("pp-ctrl-prev").style.opacity = index <= 0 ? "0.3" : "1";
         document.getElementById("pp-ctrl-next").style.opacity = index >= playlist.length - 1 ? "0.3" : "1";
+        if (topInfo) topInfo.style.display = "flex";
+      } else {
+        if (counterEl) counterEl.style.display = "none";
+        if (topInfo) topInfo.style.display = "none";
       }
-
-      if (topInfo) topInfo.style.display = "flex";
       this.drawer.render(playlist || [], index, (idx) => {
         if (this.navigationHandlers?.onSelect) this.navigationHandlers.onSelect(idx);
       });
@@ -465,13 +476,16 @@
 
       const topInfo = document.getElementById("pp-modal-top-info"), titleEl = document.getElementById("pp-modal-filename"), counterEl = document.getElementById("pp-modal-counter");
       if (titleEl) titleEl.textContent = options.fileName || "Hình ảnh";
-      if (options.playlist?.length > 0) {
+      if (options.playlist?.length > 1) {
         const curIdx = options.currentIndex >= 0 ? options.currentIndex : 0;
         if (counterEl) { counterEl.textContent = `${curIdx + 1} / ${options.playlist.length}`; counterEl.style.display = "inline-flex"; }
         document.getElementById("pp-ctrl-prev").style.opacity = curIdx <= 0 ? "0.3" : "1";
         document.getElementById("pp-ctrl-next").style.opacity = curIdx >= options.playlist.length - 1 ? "0.3" : "1";
-      } else if (counterEl) counterEl.style.display = "none";
-      if (topInfo) topInfo.style.display = "flex";
+        if (topInfo) topInfo.style.display = "flex";
+      } else {
+        if (counterEl) counterEl.style.display = "none";
+        if (topInfo) topInfo.style.display = "none";
+      }
 
       this.drawer.render(options.playlist || [], options.currentIndex || 0, (idx) => {
         this.navigationHandlers?.onSelect?.(idx);
@@ -539,7 +553,7 @@
 
       if (titleEl) titleEl.textContent = options.fileName || "PikPak Video Stream";
 
-      if (options.playlist && options.playlist.length > 0) {
+      if (options.playlist && options.playlist.length > 1) {
         const total = options.playlist.length;
         const curIdx = options.currentIndex >= 0 ? options.currentIndex : 0;
         if (counterEl) {
@@ -548,11 +562,11 @@
         }
         document.getElementById("pp-ctrl-prev").style.opacity = curIdx <= 0 ? "0.3" : "1";
         document.getElementById("pp-ctrl-next").style.opacity = curIdx >= total - 1 ? "0.3" : "1";
-      } else if (counterEl) {
-        counterEl.style.display = "none";
+        if (topInfo) topInfo.style.display = "flex";
+      } else {
+        if (counterEl) counterEl.style.display = "none";
+        if (topInfo) topInfo.style.display = "none";
       }
-
-      if (topInfo) topInfo.style.display = "flex";
 
       // Delegate Drawer rendering
       this.drawer.render(options.playlist || [], options.currentIndex || 0, (idx) => {
@@ -677,43 +691,14 @@
       (document.body || document.documentElement).classList.add("pp-cinema-active");
       this.purgeUnusedMediaAndLayers();
 
-      // Mount stream to modal video
-      if (this.modalVideo.src !== effectiveStreamUrl) {
-        this.modalVideo.src = effectiveStreamUrl;
-        this.modalVideo.currentTime = 0;
-        this.modalVideo.load();
-      }
       this.preview?.setSource(effectiveStreamUrl);
-
       this.pushHistoryState();
       this.modalContainer.classList.add("active");
       this.isModalOpen = true;
 
-      const playPromise = this.modalVideo.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            console.log("[PikPak Cinema] ▶️ Video bắt đầu phát!");
-            this.updatePlayPauseUI();
-          })
-          .catch((err) => {
-            console.warn("[PikPak Cinema] Muted fallback autoplay:", err.message);
-            this.modalVideo.muted = true;
-            this.updateVolumeUI();
-            this.modalVideo.play()
-              .then(() => {
-                console.log("[PikPak Cinema] ▶️ Video phát ở chế độ tắt tiếng!");
-                this.updatePlayPauseUI();
-              })
-              .catch((e) => {
-                console.warn("[PikPak Cinema] Autoplay blocked completely:", e.message);
-                this.updatePlayPauseUI();
-              });
-          });
-      }
-
       this.resetIdleTimer();
-      this.bufferManager?.start(streamUrl, options);
+      this.bufferManager?.start(effectiveStreamUrl, options);
+      this.mountStreamSource(effectiveStreamUrl, 0, true);
       console.log("%c[PikPak Ultra] 🎬 Cinema Player Engine hoàn thiện!", "color: #0a84ff; font-weight: bold;");
     }
 
@@ -767,9 +752,6 @@
       const curTime = this.modalVideo.currentTime || 0;
       const wasPlaying = !this.modalVideo.paused;
       this.currentStreamUrl = newUrl;
-      this.modalVideo.src = newUrl;
-      this.modalVideo.load();
-      this.preview?.setSource(newUrl);
 
       // Update quality dropdown UI
       const matched = this.currentOptions?.streams?.find((s) => s.url === newUrl);
@@ -781,13 +763,35 @@
         });
       }
 
+      this.preview?.setSource(newUrl);
+      this.bufferManager?.start(newUrl, this.currentOptions);
+      this.mountStreamSource(newUrl, curTime, wasPlaying || isUser);
+
+      if (isUser) this.shortcuts?.showHud("Đổi độ phân giải", null);
+    }
+
+    mountStreamSource(url, curTime = 0, autoplay = true) {
+      if (!this.modalVideo || !url) return;
+
+      const matched = this.currentOptions?.streams?.find((s) => s.url === url);
+      const isOriginal = Boolean(matched?.isOriginal);
+      console.log(`[PikPak Cinema] 🎬 Video: Nạp luồng ${isOriginal ? "Original (Bản gốc)" : (matched?.quality || "Transcode")}:`, url);
+
+      this.currentStreamUrl = url;
+
+      // Nạp trực tiếp 100% bằng Native HTML5 Video Engine (GPU Hardware Acceleration)
+      // KHÔNG gán currentTime = 0 trước khi load() vì sẽ gây HTTP Range abort / lỗi 416
+      if (this.modalVideo.src !== url) {
+        this.modalVideo.src = url;
+        this.modalVideo.load();
+      }
+
       const onMetadata = () => {
         this.modalVideo.removeEventListener("loadedmetadata", onMetadata);
         if (curTime > 0) {
           try { this.modalVideo.currentTime = curTime; } catch (_) {}
         }
-        this.bufferManager?.start(newUrl, this.currentOptions);
-        if (wasPlaying || isUser) {
+        if (autoplay) {
           this.modalVideo.play().then(() => {
             this.updatePlayPauseUI();
           }).catch(() => {
@@ -799,8 +803,6 @@
         }
       };
       this.modalVideo.addEventListener("loadedmetadata", onMetadata);
-
-      if (isUser) this.shortcuts?.showHud("Đổi độ phân giải", null);
     }
 
     showPlaybackErrorUI(error) {
