@@ -3,6 +3,15 @@
   "name": "PikPak Streamer Ultra Pro Max",
   "version": "1.0.0",
   "description": "Xem video full trực tiếp từ link chia sẻ công khai PikPak mà không cần lưu vào tài khoản hay giới hạn 30s.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "pikpak-streamer@khanhnkq.local",
+      "strict_min_version": "115.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  },
   "icons": {
     "16": "icons/icon-16.png",
     "48": "icons/icon-48.png",
@@ -10,7 +19,6 @@
   },
   "permissions": [
     "declarativeNetRequest",
-    "declarativeNetRequestWithHostAccess",
     "storage",
     "activeTab"
   ],
@@ -25,7 +33,12 @@
     "*://*.pikpakdrive.com/*"
   ],
   "background": {
-    "service_worker": "service-worker.js"
+    "scripts": [
+      "lib/constants.js",
+      "lib/md5.js",
+      "lib/pikpak-api.js",
+      "service-worker.js"
+    ]
   },
   "action": {
     "default_popup": "popup/popup.html",
@@ -44,8 +57,7 @@
       "js": [
         "content/injector.js"
       ],
-      "run_at": "document_start",
-      "world": "ISOLATED"
+      "run_at": "document_start"
     }
   ],
   "web_accessible_resources": [
