@@ -828,8 +828,24 @@
     );
 
     if (isFolder) {
-      // Không preventDefault/stopPropagation: native PikPak handler cần nhận
-      // đúng event target và event detail để mở folder.
+      const folderRow = itemEl.closest("[data-encoded-id]") || itemEl.closest("li, .grid.row");
+      const encodedFolderId = folderRow?.getAttribute("data-encoded-id") || "";
+      const actualFolderId = folderRow?.id || itemEl.id || "";
+      if (!encodedFolderId && !actualFolderId) return;
+
+      // PikPak's one-click route token lives on the row, not on the inner
+      // card. Navigate with that token directly instead of dispatching a
+      // synthetic dblclick, which makes PikPak resolve the folder as
+      // `/undefined`.
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
+      const path = window.location.pathname.replace(/\/+$/, "");
+      const nextFolderToken = encodedFolderId || actualFolderId;
+      const nextPath = `${path}/${encodeURIComponent(nextFolderToken)}`;
+      const nextUrl = `${window.location.origin}${nextPath}${window.location.search}${window.location.hash}`;
+      if (nextUrl !== window.location.href) window.location.assign(nextUrl);
       return;
     }
 
