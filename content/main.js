@@ -238,6 +238,58 @@
   }
 
   let isModifyingDom = false;
+  let nuxtMediaCacheKey = "";
+  let nuxtMediaById = new Map();
+  let nuxtMediaByName = new Map();
+
+  function getNuxtMediaMetadata() {
+    const raw = document.querySelector("#__NUXT_DATA__")?.textContent || "";
+    if (!raw) return { byId: nuxtMediaById, byName: nuxtMediaByName };
+    if (raw === nuxtMediaCacheKey) return { byId: nuxtMediaById, byName: nuxtMediaByName };
+
+    const byId = new Map();
+    const byName = new Map();
+    try {
+      const data = JSON.parse(raw);
+      const resolve = (value, seen = new Set()) => {
+        if (value === -1) return undefined;
+        if (Number.isInteger(value) && value >= 0 && value < data.length) {
+          if (seen.has(value)) return undefined;
+          const nextSeen = new Set(seen);
+          nextSeen.add(value);
+          return resolve(data[value], nextSeen);
+        }
+        if (Array.isArray(value)) {
+          if (["Reactive", "ShallowReactive", "Circular"].includes(value[0])) return resolve(value[1], seen);
+          return value.map((item) => resolve(item, seen));
+        }
+        if (value && typeof value === "object") {
+          const result = {};
+          Object.entries(value).forEach(([key, item]) => { result[key] = resolve(item, seen); });
+          return result;
+        }
+        return value;
+      };
+
+      data.forEach((value) => {
+        if (!value || Array.isArray(value) || !Number.isInteger(value.files)) return;
+        const resolved = resolve(value);
+        if (!Array.isArray(resolved?.files)) return;
+        resolved.files.forEach((item) => {
+          if (!item?.id || !item?.name || item.kind === "drive#folder") return;
+          const duration = parseInt(item.params?.duration || item.medias?.[0]?.video?.duration || item.duration || 0, 10) || 0;
+          const metadata = { duration, isVideo: item.mime_type?.startsWith("video/") };
+          byId.set(item.id, metadata);
+          byName.set(normalizeMediaName(item.name), metadata);
+        });
+      });
+    } catch (_) {}
+
+    nuxtMediaCacheKey = raw;
+    nuxtMediaById = byId;
+    nuxtMediaByName = byName;
+    return { byId, byName };
+  }
 
   function sortPlaylist(list) {
     if (!Array.isArray(list)) return [];
@@ -269,12 +321,16 @@
 
   function getElementDuration(el) {
     if (!el) return 0;
-    try {
-      const comp = el.__vueParentComponent || el.__vnode?.ctx;
-      const vItem = comp?.props?.item || comp?.setupState?.item || comp?.data?.item || el.__vue__?.item;
-      const s = parseInt(vItem?.params?.duration || vItem?.medias?.[0]?.video?.duration || 0, 10);
-      if (s > 0) return s;
-    } catch (_) {}
+
+    const candidates = [el, ...el.querySelectorAll(".file-item, .thumbnail, .file-cover")];
+    for (const candidate of candidates) {
+      try {
+        const comp = candidate.__vueParentComponent || candidate.__vnode?.ctx;
+        const vItem = comp?.props?.item || comp?.setupState?.item || comp?.data?.item || candidate.__vue__?.item;
+        const s = parseInt(vItem?.params?.duration || vItem?.medias?.[0]?.video?.duration || 0, 10);
+        if (s > 0) return s;
+      } catch (_) {}
+    }
 
     const badge = el.querySelector(".pp-web-duration-badge");
     if (badge && badge.textContent) {
@@ -289,7 +345,11 @@
       if (matched && matched.duration > 0) return matched.duration;
     }
 
-    return 0;
+    const row = el.matches("[id]") ? el : el.closest("[id]");
+    const metadata = getNuxtMediaMetadata();
+    const fromId = row?.id ? metadata.byId.get(row.id) : null;
+    const fromName = metadata.byName.get(normalizeMediaName(rawName));
+    return fromId?.duration || fromName?.duration || 0;
   }
 
   function getElementCategory(el) {
@@ -336,7 +396,9 @@
 
   function sortWebDomFiles() {
     if (isModifyingDom || window.PikPakPlayer?.isModalOpen) return;
-    const items = document.querySelectorAll('.file-item, .grid.file-item, .file-list-item, .el-table__row');
+    const items = [...new Set(document.querySelectorAll(
+      'li.grid.row, li.file-list-item, .file-list-item, .el-table__row'
+    ))];
     if (items.length < 2) return;
 
     const parentMap = new Map();
@@ -492,6 +554,7 @@
     sortWebDomFiles();
     harvestPikPakThumbnails();
     renderDurationBadgesOnWeb();
+    setTimeout(sortWebDomFiles, 100);
   }
 
   const modalObserver = new MutationObserver(() => {
@@ -503,6 +566,7 @@
   });
   modalObserver.observe(document.documentElement, { childList: true, subtree: true });
   setInterval(suppressNativePreview, 300);
+  setInterval(sortWebDomFiles, 1000);
   suppressNativePreview();
 
   // ====== 5. Playlist & Navigation State ======
@@ -1019,6 +1083,7 @@
         }
         harvestPikPakThumbnails();
         updateControls();
+        setTimeout(sortWebDomFiles, 80);
       }
     } catch (err) {
       console.warn("[PikPak Ultra] Không thể resolve folder hiện tại:", { shareId, parentId, error: err?.message || String(err) });
@@ -1078,6 +1143,7 @@
           currentPlaylist = incomingPlaylist;
           harvestPikPakThumbnails();
           updateControls();
+          setTimeout(sortWebDomFiles, 80);
         }
       }
     });
