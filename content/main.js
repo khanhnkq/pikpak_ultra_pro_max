@@ -61,6 +61,35 @@
   }
 
   // ====== 3. Share Context Extractor ======
+  function getNuxtCurrentFolderId() {
+    try {
+      const raw = document.querySelector("#__NUXT_DATA__")?.textContent;
+      if (!raw) return "";
+      const data = JSON.parse(raw);
+      const dereference = (value, seen = new Set()) => {
+        if (!Number.isInteger(value) || value < 0 || value >= data.length || seen.has(value)) return value;
+        seen.add(value);
+        const resolved = data[value];
+        if (Array.isArray(resolved) && (resolved[0] === "Reactive" || resolved[0] === "ShallowReactive")) {
+          return dereference(resolved[1], seen);
+        }
+        return resolved;
+      };
+
+      const shareState = data.find((value) => (
+        value && !Array.isArray(value) &&
+        Number.isInteger(value.dirs) && Number.isInteger(value.detail)
+      ));
+      const dirs = shareState ? dereference(shareState.dirs) : null;
+      const currentDirRef = Array.isArray(dirs) ? dirs[dirs.length - 1] : null;
+      const currentDir = dereference(currentDirRef);
+      const currentFolderId = dereference(currentDir?.id);
+      return typeof currentFolderId === "string" ? currentFolderId : "";
+    } catch (_) {
+      return "";
+    }
+  }
+
   function getShareContext() {
     const net = window.PikPakNetwork ? window.PikPakNetwork.getIntercepted() : {};
     let shareId = null, parentId = "", fileId = "";
@@ -74,11 +103,12 @@
       if (segs.length > 1) parentId = segs[segs.length - 1];
     }
     const sp = new URLSearchParams(window.location.search);
+    const nuxtParentId = getNuxtCurrentFolderId();
     return {
       shareId: shareId || net.shareId || sp.get("share_id") || null,
       // The API request is authoritative on nested routes; use the URL only
       // as a fallback because the route may contain both folder and item IDs.
-      parentId: net.parentId || sp.get("parent_id") || parentId || "",
+      parentId: net.parentId || sp.get("parent_id") || nuxtParentId || parentId || "",
       fileId: net.fileId || sp.get("file_id") || fileId || ""
     };
   }
