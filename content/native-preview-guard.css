@@ -1,0 +1,13 @@
+/* PikPak's own preview must never compete with the extension player. */
+#manager-preview-bar,
+#restore_teleport,
+[data-file-preview],
+body > div:has(> [data-file-preview]),
+.file-explorer-operation-box,
+[id*="restore_teleport"],
+.restore_teleport,
+[class*="restore_teleport"] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}

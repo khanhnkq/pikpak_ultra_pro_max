@@ -41,6 +41,9 @@
         "*://*.mypikpak.com/s/*",
         "*://*.mypikpak.net/s/*"
       ],
+      "css": [
+        "content/native-preview-guard.css"
+      ],
       "js": [
         "content/injector.js"
       ],

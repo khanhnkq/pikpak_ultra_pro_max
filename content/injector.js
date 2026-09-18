@@ -37,6 +37,65 @@
     (document.head || document.documentElement).appendChild(scriptEl);
   }
 
+  // PikPak may create its native preview before the heavier extension modules
+  // finish loading. Hide only PikPak's native preview surfaces from the first
+  // paint; the extension player is excluded explicitly.
+  function installNativePreviewGuard() {
+    const nativeLayerSelectors = [
+      "#manager-preview-bar",
+      "#restore_teleport",
+      "[data-file-preview]",
+      "body > div:has(> [data-file-preview])",
+      ".file-explorer-operation-box",
+      '[id*="restore_teleport"]',
+      ".restore_teleport",
+      '[class*="restore_teleport"]',
+      "div.preview-layer",
+      'div[class*="play-modal"]',
+      'div[class*="preview-player"]',
+      'div[class*="video-modal"]',
+      'div[class*="play-layer"]',
+      'div[class*="preview-box"]',
+      'div[class*="player-box"]',
+      "div.player-container",
+      "div.video-container",
+      ".dplayer",
+      ".artplayer-app",
+      ".artplayer",
+      ".preview-bar",
+      ".video-preview",
+      ".media-preview",
+    ];
+    const selector = nativeLayerSelectors.join(", ");
+
+    const hideNativePreview = () => {
+      document.querySelectorAll(selector).forEach((layer) => {
+        if (layer.closest("#pikpak-ultra-cinema-modal, #pp-player-container")) return;
+        layer.style.setProperty("display", "none", "important");
+        layer.style.setProperty("visibility", "hidden", "important");
+        layer.style.setProperty("pointer-events", "none", "important");
+      });
+      document.querySelectorAll("video, audio").forEach((media) => {
+        if (media.closest("#pikpak-ultra-cinema-modal, #pp-player-container")) return;
+        try {
+          media.pause();
+          media.autoplay = false;
+          media.removeAttribute("autoplay");
+        } catch (_) {}
+      });
+    };
+
+    const start = () => {
+      hideNativePreview();
+      const observer = new MutationObserver(hideNativePreview);
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      window.setInterval(hideNativePreview, 250);
+    };
+
+    if (document.documentElement) start();
+    else document.addEventListener("DOMContentLoaded", start, { once: true });
+  }
+
   // Inject the heavier player modules in dependency order after the first paint.
   function injectPlayerScripts() {
     const scripts = [
@@ -135,5 +194,6 @@
     }
   });
 
+  installNativePreviewGuard();
   injectNetworkInterceptor(schedulePlayerBootstrap);
 })();

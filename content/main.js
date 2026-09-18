@@ -7,11 +7,10 @@
 
   const BRIDGE_SOURCE_PAGE = "PIKPAK_PAGE_SCRIPT";
   const BRIDGE_SOURCE_EXT = "PIKPAK_INJECTOR_SCRIPT";
-  const BG_VIDEO_SELECTOR = "video:not(#pikpak-ultra-modal-video):not(#pp-scrub-preview-video)";
 
   let pendingRequests = new Map(), currentShareId = null, currentParentId = "";
   let resolvedShareData = null, activeStreamData = null, isUnlocked = false;
-  let currentPlaylist = [], currentVideoIndex = -1, isAutoUnlocking = false;
+  let currentPlaylist = [], currentVideoIndex = -1;
   const CLOUD_TEMP_STATE_KEY = "pikpak_temp_cloud_file_ids";
   let currentCloudCachedFileId = null;
   let currentCloudCachedFileIds = [];
@@ -147,6 +146,59 @@
       }
     });
   }
+
+  // PikPak can mount its own preview player when a share route contains a
+  // media/folder token. The extension owns media playback, so the native
+  // preview must stay closed even after a media click.
+  function suppressNativePreview() {
+    const nativeLayerSelectors = [
+      "#manager-preview-bar",
+      "#restore_teleport",
+      "[data-file-preview]",
+      "body > div:has(> [data-file-preview])",
+      ".file-explorer-operation-box",
+      '[id*="restore_teleport"]',
+      ".restore_teleport",
+      '[class*="restore_teleport"]',
+      "div.preview-layer",
+      'div[class*="play-modal"]',
+      'div[class*="preview-player"]',
+      'div[class*="video-modal"]',
+      'div[class*="play-layer"]',
+      'div[class*="preview-box"]',
+      'div[class*="player-box"]',
+      "div.player-container",
+      "div.video-container",
+      ".dplayer",
+      ".artplayer-app",
+      ".artplayer",
+      ".preview-bar",
+      ".video-preview",
+      ".media-preview",
+    ];
+
+    document.querySelectorAll(nativeLayerSelectors.join(", ")).forEach((layer) => {
+      if (layer.closest("#pikpak-ultra-cinema-modal, #pp-player-container")) return;
+      layer.style.setProperty("display", "none", "important");
+      layer.style.setProperty("visibility", "hidden", "important");
+      layer.style.setProperty("pointer-events", "none", "important");
+    });
+
+    document.querySelectorAll("video:not(#pikpak-ultra-modal-video):not(#pp-scrub-preview-video), audio").forEach((media) => {
+      if (media.closest("#pikpak-ultra-cinema-modal, #pp-player-container")) return;
+      try {
+        media.pause();
+        media.autoplay = false;
+        media.removeAttribute("autoplay");
+      } catch (_) {}
+    });
+  }
+
+  document.addEventListener("play", (event) => {
+    if (event.target instanceof HTMLMediaElement && !event.target.closest("#pikpak-ultra-cinema-modal, #pp-player-container")) {
+      suppressNativePreview();
+    }
+  }, true);
 
   function formatDuration(sec) {
     const s = parseInt(sec, 10);
@@ -405,11 +457,11 @@
   let observerThrottleTimer = null;
   function handleDomMutations() {
     if (isModifyingDom || window.PikPakPlayer?.isModalOpen) return;
+    suppressNativePreview();
     suppressModals();
     sortWebDomFiles();
     harvestPikPakThumbnails();
     renderDurationBadgesOnWeb();
-    checkAndAutoUnlock();
   }
 
   const modalObserver = new MutationObserver(() => {
@@ -420,6 +472,8 @@
     }, 700);
   });
   modalObserver.observe(document.documentElement, { childList: true, subtree: true });
+  setInterval(suppressNativePreview, 300);
+  suppressNativePreview();
 
   // ====== 5. Playlist & Navigation State ======
   async function playMediaByIndex(index) {
@@ -634,46 +688,6 @@
     }
   }
 
-  // ====== 8. Auto-Unlock Watcher ======
-  async function checkAndAutoUnlock() {
-    if (window.PikPakPlayer?.isModalOpen || isAutoUnlocking) return;
-    const { shareId } = getShareContext();
-    if (!shareId) return; // Chỉ auto-unlock khi đang duyệt link chia sẻ công khai
-    const currentVideo = document.querySelector(BG_VIDEO_SELECTOR);
-    if (!currentVideo || currentVideo.dataset.ppUnlocked === "true" || currentVideo.dataset.ppUnlocked === "failed") return;
-    isAutoUnlocking = true;
-
-    const attempts = parseInt(currentVideo.dataset.ppAttempts || "0", 10) + 1;
-    currentVideo.dataset.ppAttempts = attempts.toString();
-    if (attempts >= 3) { currentVideo.dataset.ppUnlocked = "failed"; isAutoUnlocking = false; return; }
-
-    try { currentVideo.muted = true; currentVideo.volume = 0; currentVideo.pause(); currentVideo.style.display = "none"; } catch (_) {}
-
-    try {
-      const { shareId, parentId, fileId } = getShareContext();
-      if (shareId && currentPlaylist.length > 0) {
-        currentVideo.dataset.ppUnlocked = "true"; updateControls();
-        const targetIdx = currentVideoIndex >= 0 ? currentVideoIndex : 0;
-        await loadAndPlayFile(shareId, currentPlaylist[targetIdx].id);
-      } else if (shareId && fileId) {
-        currentVideo.dataset.ppUnlocked = "true";
-        await loadAndPlayFile(shareId, fileId);
-      } else if (shareId && parentId) {
-        // Nested folder reloads have a parentId but no fileId. Resolve the
-        // folder playlist first; never try to restore the folder as a video.
-        prefetchPlaylist();
-      } else {
-        currentVideo.dataset.ppUnlocked = "failed";
-        window.PikPakPlayer?.hideLoading?.();
-        showToast("Không định vị được video share để lưu vào Cloud.", true);
-      }
-    } catch (err) {
-      console.warn("[PikPak Ultra] Auto-unlock error:", err.message);
-    } finally {
-      isAutoUnlocking = false;
-    }
-  }
-
   function selectPreferredStreamUrl(url, streams = [], fileName = "") {
     const isAviOrNonNative = /\.(avi|wmv|flv|rmvb|rm|asf|divx|vob|ts|m2ts|3gp)(\?|$)/i.test(url || "") ||
       /\.(avi|wmv|flv|rmvb|rm|asf|divx|vob|ts|m2ts|3gp)$/i.test(fileName || "");
@@ -758,10 +772,17 @@
   let activeOpeningMediaKey = null;
 
   function handleFileItemClick(e) {
+    // PikPak dispatches synthetic clicks when it restores its own preview
+    // player. They must never be treated as a user request for our player.
+    if (!e.isTrusted) return;
+
     const itemEl = e.target.closest('.file-list-item, [class*="file-item"], [class*="file_item"], .el-table__row, [class*="grid-item"], [class*="card-item"]');
     if (!itemEl || e.target.closest('input, .el-checkbox, [class*="checkbox"], [class*="more-btn"], [class*="action-btn"], [class*="download"]')) return;
 
-    // 1. Phân biệt thư mục: Mở thư mục ngay lập tức chỉ với 1 click
+    // 1. Phân biệt thư mục: để PikPak xử lý click/double-click nguyên bản.
+    // Extension không được synthesize event ở đây vì handler của PikPak đọc
+    // route id từ event target; dispatch event vào icon/card con có thể tạo
+    // URL `/undefined`.
     let comp = null, vItem = null;
     try {
       comp = itemEl.__vueParentComponent || itemEl.__vnode?.ctx;
@@ -777,64 +798,8 @@
     );
 
     if (isFolder) {
-      if (e._ppSynthesized) return;
-      if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey) return;
-      if (e.target.closest('input, .el-checkbox, [class*="checkbox"], [class*="more-btn"], [class*="action-btn"], [class*="download"], .grid-operation, .el-dropdown')) return;
-
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-
-      const targetEl = e.target || itemEl;
-
-      // Thử gọi hàm mở folder trực tiếp từ Vue component nếu có
-      try {
-        if (comp) {
-          const itemData = vItem || comp.props?.item;
-          const methods = [
-            comp.setupState?.openFolder,
-            comp.setupState?.handleOpen,
-            comp.setupState?.handleDblclick,
-            comp.setupState?.onItemDblclick,
-            comp.setupState?.onDblclick,
-            comp.setupState?.openItem,
-            comp.ctx?.handleDblclick,
-            comp.ctx?.openFolder,
-            comp.ctx?.openItem,
-          ];
-          for (const fn of methods) {
-            if (typeof fn === "function") {
-              fn(itemData);
-              break;
-            }
-          }
-        }
-      } catch (_) {}
-
-      // Kích hoạt dblclick để Vue/PikPak mở thư mục ngay lập tức
-      const dblClickEvent = new MouseEvent("dblclick", {
-        bubbles: true,
-        cancelable: true,
-        view: window,
-        detail: 2,
-      });
-      dblClickEvent._ppSynthesized = true;
-
-      targetEl.dispatchEvent(dblClickEvent);
-      if (targetEl !== itemEl) {
-        itemEl.dispatchEvent(dblClickEvent);
-      }
-
-      // Kích hoạt click thứ 2 với detail = 2 đề phòng PikPak kiểm tra click detail
-      const secondClickEvent = new MouseEvent("click", {
-        bubbles: true,
-        cancelable: true,
-        view: window,
-        detail: 2,
-      });
-      secondClickEvent._ppSynthesized = true;
-      targetEl.dispatchEvent(secondClickEvent);
-
+      // Không preventDefault/stopPropagation: native PikPak handler cần nhận
+      // đúng event target và event detail để mở folder.
       return;
     }
 
@@ -859,7 +824,6 @@
     e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
     const { shareId } = getShareContext();
     if (!shareId) return;
-
     const mediaName = matchedMedia?.name || clickedMediaName || (isImage ? "Hình ảnh" : "Video");
     const playIdx = matchedIdx !== -1 ? matchedIdx : 0;
     const targetFileId = matchedMedia?.id || getClickedMediaId(itemEl, vItem);
@@ -922,6 +886,8 @@
 
   // Chặn dblclick trên file media để PikPak native player KHÔNG BAO GIỜ mở thêm layer thứ 2
   function handleFileItemDblClick(e) {
+    if (!e.isTrusted) return;
+
     const itemEl = e.target.closest('.file-list-item, [class*="file-item"], [class*="file_item"], .el-table__row, [class*="grid-item"], [class*="card-item"]');
     if (!itemEl) return;
     if (e.target.closest('input, .el-checkbox, [class*="checkbox"], [class*="more-btn"], [class*="action-btn"], [class*="download"]')) return;
@@ -985,7 +951,6 @@
         currentPlaylist = sortPlaylist(netPlaylist);
         harvestPikPakThumbnails();
         updateControls();
-        checkAndAutoUnlock();
       }
       return;
     }
@@ -1008,7 +973,6 @@
         }
         harvestPikPakThumbnails();
         updateControls();
-        checkAndAutoUnlock();
       }
     } catch (err) {
       console.warn("[PikPak Ultra] Không thể resolve folder hiện tại:", { shareId, parentId, error: err?.message || String(err) });
@@ -1021,10 +985,6 @@
   let lastCheckedHref = window.location.href;
   setInterval(() => {
     if (isContextInvalidated) return;
-    if (!window.PikPakPlayer?.isModalOpen) {
-      checkAndAutoUnlock();
-    }
-
     const currentHref = window.location.href;
     const hrefChanged = currentHref !== lastCheckedHref;
     if (hrefChanged) {
@@ -1045,7 +1005,7 @@
       const matchedIdx = currentPlaylist.findIndex((v) => v.id === targetId);
       if (matchedIdx !== -1 && matchedIdx !== currentVideoIndex && !window.PikPakPlayer?.isModalOpen) {
         currentParentId = parentId;
-        playMediaByIndex(matchedIdx);
+        currentVideoIndex = matchedIdx;
       }
       return;
     }
@@ -1064,10 +1024,6 @@
 
   if (window.PikPakNetwork) {
     window.PikPakNetwork.onPlaylist((videos) => {
-      const { shareId, parentId, fileId } = getShareContext();
-      if (shareId && (fileId || parentId || currentPlaylist.length > 0)) {
-        checkAndAutoUnlock();
-      }
       if (videos?.length > 0) {
         const incomingPlaylist = sortPlaylist(videos);
         // PikPak đôi khi gửi response chi tiết chỉ có 1 file sau khi đã gửi
