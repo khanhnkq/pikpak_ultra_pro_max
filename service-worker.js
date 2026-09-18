@@ -88,6 +88,9 @@ async function handleResolveShare({ shareId, passCode = "", parentId = "" }) {
 
   const result = await client.listFolderFiles(shareId, passCode, parentId);
   console.log(`[ServiceWorker] ✅ RESOLVE_SHARE success: ${result.videos.length} videos, ${result.subfolders.length} subfolders`);
+  const mediaFiles = Array.isArray(result.mediaFiles) && result.mediaFiles.length > 0
+    ? result.mediaFiles
+    : (result.videos || []);
 
   return {
     shareId,
@@ -95,7 +98,7 @@ async function handleResolveShare({ shareId, passCode = "", parentId = "" }) {
     videos: result.videos,
     subfolders: result.subfolders,
     allFiles: result.allFiles || [],
-    mediaFiles: result.mediaFiles || result.videos,
+    mediaFiles,
     totalFiles: result.allFiles.length,
     videoCount: result.videos.length,
     targetFileId: result.targetFileId || null,

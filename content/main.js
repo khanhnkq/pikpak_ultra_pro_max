@@ -84,6 +84,59 @@
     };
   }
 
+  function normalizeMediaName(name = "") {
+    return String(name).split(/[\\/]/).pop().trim().toLowerCase().replace(/\s+/g, " ");
+  }
+
+  function getMediaList(response) {
+    if (Array.isArray(response?.mediaFiles) && response.mediaFiles.length > 0) return response.mediaFiles;
+    return Array.isArray(response?.videos) ? response.videos : [];
+  }
+
+  function findMediaByName(mediaList, name) {
+    const normalizedName = normalizeMediaName(name);
+    if (!normalizedName) return null;
+    return mediaList.find((item) => normalizeMediaName(item?.name) === normalizedName) || null;
+  }
+
+  function getClickedMediaName(itemEl, vItem) {
+    const nameEl = itemEl.querySelector('.name .ellipsis, .name, [class*="file-name"], [class*="title"]');
+    const text = (itemEl.textContent || "").replace(/\s+/g, " ").trim();
+    const nameFromText = text.split(/\s+\d+(?:\.\d+)?\s*(?:B|KB|MB|GB|TB)\b/i)[0]?.trim();
+    return vItem?.name || itemEl.querySelector("img")?.alt || nameEl?.textContent?.trim() || nameFromText || text;
+  }
+
+  function getClickedMediaId(itemEl, vItem) {
+    const { shareId, parentId } = getShareContext();
+    const candidates = [
+      vItem?.id,
+      itemEl.dataset.fileId,
+      itemEl.dataset.id,
+      itemEl.getAttribute("data-file-id"),
+      itemEl.getAttribute("data-id"),
+      itemEl.id,
+    ];
+    return candidates.find((id) => id && id !== shareId && id !== parentId && !/^el-id-/i.test(id)) || "";
+  }
+
+  async function resolveSharePlaylist(shareId, parentId = "") {
+    const parentCandidates = [...new Set([parentId, ""].filter((id) => typeof id === "string"))];
+    let lastError = null;
+
+    for (const candidateParentId of parentCandidates) {
+      try {
+        const response = await sendToExtension("RESOLVE_SHARE", { shareId, parentId: candidateParentId });
+        const mediaList = getMediaList(response);
+        if (mediaList.length > 0) return { mediaList, response, parentId: candidateParentId };
+      } catch (err) {
+        lastError = err;
+      }
+    }
+
+    if (lastError) throw lastError;
+    return { mediaList: [], response: null, parentId: "" };
+  }
+
   // ====== 4. Suppress Limit Modals, Harvest Thumbnails & Badges ======
   function suppressModals() {
     if (!isUnlocked) return;
@@ -786,13 +839,15 @@
     }
 
     const itemText = (itemEl.textContent || "").trim();
+    const clickedMediaName = getClickedMediaName(itemEl, vItem);
     const isVideoExt = /\.(mp4|mkv|avi|mov|wmv|flv|webm|ts|m4v|3gp|rmvb|iso)/i.test(itemText);
     const isImageExt = /\.(jpe?g|png|webp|gif|bmp|svg|avif|heic|tiff)/i.test(itemText);
     const hasPlayIcon = Boolean(itemEl.querySelector(".play-icon, [class*='play-icon']"));
 
     let matchedMedia = null, matchedIdx = -1;
     if (currentPlaylist?.length > 0) {
-      matchedIdx = currentPlaylist.findIndex((v) => v?.name && (itemText.includes(v.name) || v.name.includes(itemText.split("\n")[0])));
+      matchedMedia = findMediaByName(currentPlaylist, clickedMediaName);
+      matchedIdx = matchedMedia ? currentPlaylist.indexOf(matchedMedia) : -1;
       if (matchedIdx !== -1) matchedMedia = currentPlaylist[matchedIdx];
     }
 
@@ -805,9 +860,9 @@
     const { shareId } = getShareContext();
     if (!shareId) return;
 
-    const mediaName = matchedMedia ? matchedMedia.name : (vItem?.name || itemText.split("\n")[0] || (isImage ? "Hình ảnh" : "Video"));
+    const mediaName = matchedMedia?.name || clickedMediaName || (isImage ? "Hình ảnh" : "Video");
     const playIdx = matchedIdx !== -1 ? matchedIdx : 0;
-    const targetFileId = matchedMedia?.id || vItem?.id;
+    const targetFileId = matchedMedia?.id || getClickedMediaId(itemEl, vItem);
 
     // Chặn double-click hoặc nhấn liên tiếp quá nhanh vào cùng 1 media (tránh mở 2 layer)
     const mediaKey = targetFileId || mediaName;
@@ -837,22 +892,27 @@
       currentVideoIndex = playIdx;
       loadAndPlayFile(shareId, targetFileId);
     } else {
-      const target = currentPlaylist?.find((v) => itemText.includes(v.name)) || currentPlaylist?.[0];
+      const target = findMediaByName(currentPlaylist || [], mediaName);
       if (target) {
         currentVideoIndex = currentPlaylist.indexOf(target);
         loadAndPlayFile(shareId, target.id);
       } else {
         const { parentId } = getShareContext();
-        sendToExtension("RESOLVE_SHARE", { shareId, parentId }).then((res) => {
-          const list = res?.mediaFiles || res?.videos || [];
-          if (list.length > 0) {
-            currentPlaylist = sortPlaylist(list);
-            const target = currentPlaylist.find((v) => v?.name && (itemText.includes(v.name) || v.name.includes(itemText.split("\n")[0]))) || currentPlaylist[0];
-            currentVideoIndex = currentPlaylist.indexOf(target);
-            harvestPikPakThumbnails();
-            loadAndPlayFile(shareId, target.id);
+        resolveSharePlaylist(shareId, parentId).then(({ mediaList }) => {
+          currentPlaylist = sortPlaylist(mediaList);
+          const resolvedTarget = findMediaByName(currentPlaylist, mediaName);
+          if (!resolvedTarget) {
+            showToast(`Không tìm thấy video "${mediaName}" để lưu vào Cloud.`, true);
+            return;
           }
-          else showToast("Không tìm thấy video để lưu vào Cloud.", true);
+
+          currentVideoIndex = currentPlaylist.indexOf(resolvedTarget);
+          harvestPikPakThumbnails();
+          if (resolvedTarget.type === "image" || resolvedTarget.isImage) {
+            loadAndDisplayImage(shareId, resolvedTarget.id, resolvedTarget);
+          } else {
+            loadAndPlayFile(shareId, resolvedTarget.id);
+          }
         }).catch((err) => showToast("Lỗi mở media: " + err.message, true));
       }
     }
@@ -936,11 +996,12 @@
     isPrefetching = true;
 
     try {
-      let res = await sendToExtension("RESOLVE_SHARE", { shareId, parentId });
-      if (res?.mediaFiles?.length > 0 || res?.videos?.length > 0) {
-        currentPlaylist = sortPlaylist(res.mediaFiles || res.videos);
-        resolvedShareData = res;
-        const targetId = res.targetFileId || fileId;
+      const resolved = await resolveSharePlaylist(shareId, parentId);
+      if (resolved.mediaList.length > 0) {
+        currentPlaylist = sortPlaylist(resolved.mediaList);
+        resolvedShareData = resolved.response;
+        lastPrefetchedKey = key;
+        const targetId = resolved.response?.targetFileId || fileId;
         if (targetId && currentPlaylist.length > 0) {
           const tIdx = currentPlaylist.findIndex((v) => v.id === targetId);
           if (tIdx !== -1) currentVideoIndex = tIdx;
