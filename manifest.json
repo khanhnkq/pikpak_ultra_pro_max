@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PikPak Streamer Ultra Pro Max",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Xem video full trực tiếp từ link chia sẻ công khai PikPak mà không cần lưu vào tài khoản hay giới hạn 30s.",
   "browser_specific_settings": {
     "gecko": {
