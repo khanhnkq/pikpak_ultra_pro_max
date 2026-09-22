@@ -3,8 +3,6 @@
  * Coordinates API requests, token management, and Cloud restore/delete operations.
  */
 
-importScripts("lib/constants.js", "lib/md5.js", "lib/pikpak-api.js");
-
 const client = new self.PikPakClient();
 
 // In-memory tab state
